@@ -1,0 +1,2 @@
+# Optional: offline English speech recognition for the desktop and Android apps (first run downloads a ~150 MB model)
+faster-whisper>=1.0
