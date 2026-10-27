@@ -88,13 +88,13 @@ class Rules:
             if not self._match_cam(r, cam) or not _in_window(r.get("between")):
                 continue
             if trig == "motion" and ev["type"] == "motion":
-                self._fire(r, cam, f"{cam.name} par movement", ev)
+                self._fire(r, cam, f"Movement on {cam.name}", ev)
             elif trig == "object" and ev["type"] == "object" and r.get("label") in (None, "", "any", ev["label"]):
-                self._fire(r, cam, f"{cam.name} par {ev['label']} dikha", ev)
+                self._fire(r, cam, f"{ev['label']} seen on {cam.name}", ev)
             elif trig == "line_cross" and ev["type"] == "line_cross" and r.get("label") in (None, "", "any", ev["label"]):
-                self._fire(r, cam, f"{cam.name}: {ev['label']} line cross ({ev['detail']})", ev)
+                self._fire(r, cam, f"{cam.name}: {ev['label']} crossed the line ({ev['detail']})", ev)
             elif trig == "offline" and ev["type"] == "camera_offline":
-                self._fire(r, cam, f"{cam.name} offline ho gaya", ev)
+                self._fire(r, cam, f"{cam.name} went offline", ev)
         from . import plugins
         plugins.dispatch_event(ev)
 
@@ -105,4 +105,4 @@ class Rules:
             lb = r.get("label") or "person"
             n = counts.get(lb, 0)
             if n >= int(r.get("min_count", 1)):
-                self._fire(r, cam, f"{cam.name} par {n} {lb} ek saath (limit {r.get('min_count', 1)})")
+                self._fire(r, cam, f"{n} {lb} on {cam.name} at once (limit {r.get('min_count', 1)})")

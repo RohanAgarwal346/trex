@@ -27,9 +27,9 @@ def clip_range(cam_id, t0, t1, out_path, speed=1.0):
     """Cut [t0,t1] (epoch) out of recorded segments. Raises LookupError if nothing was recorded."""
     segs = segments_between(cam_id, t0, t1)
     if not segs:
-        raise LookupError("Us time ki recording nahi hai (us waqt recording ON nahi thi).")
+        raise LookupError("There is no recording for that time (recording was not on).")
     if (t1 - t0) / max(speed, 0.1) > MAX_OUT_SECONDS:
-        raise ValueError("Clip bahut lambi hai; chhota time range ya zyada speed lijiye.")
+        raise ValueError("That clip is too long; use a shorter time range or a higher speed.")
     lines = []
     for s in segs:
         p = DATA / s["path"]
@@ -42,7 +42,7 @@ def clip_range(cam_id, t0, t1, out_path, speed=1.0):
         if b - a > 0.2:
             lines.append(f"file '{p}'\ninpoint {a:.2f}\noutpoint {b:.2f}")
     if not lines:
-        raise LookupError("Recording files nahi mili.")
+        raise LookupError("Recording files were not found.")
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
         f.write("\n".join(lines))
         lst = f.name
@@ -62,7 +62,7 @@ def clip_range(cam_id, t0, t1, out_path, speed=1.0):
 def frame_at(cam_id, ts, out_path):
     segs = segments_between(cam_id, ts, ts)
     if not segs:
-        raise LookupError("Us waqt ki recording nahi hai.")
+        raise LookupError("There is no recording for that time.")
     s = segs[0]
     p = DATA / s["path"]
     vd = _dur(p) or (s["end"] - s["start"])
@@ -70,4 +70,4 @@ def frame_at(cam_id, ts, out_path):
     r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{max(0, off):.2f}", "-i", str(p), "-frames:v", "1", "-q:v", "2", str(out_path)],
                        capture_output=True, text=True)
     if r.returncode != 0 or not Path(out_path).exists():
-        raise RuntimeError("Frame nikal nahi paya")
+        raise RuntimeError("Could not extract the frame")

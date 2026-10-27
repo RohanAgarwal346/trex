@@ -107,13 +107,13 @@ def get_video_clip(camera=None, last_seconds=None, next_seconds=None, start=None
             t0 = parse_time(start) if start else ts - 60
             t1 = parse_time(end) if end else ts
             if t1 <= t0:
-                raise ValueError("end time start se pehle hai")
+                raise ValueError("end time is before start time")
             try:
                 a, b = media.clip_range(cam.id, t0, t1, p, speed)
             except LookupError as e:
                 if ts - t1 < 25 and cam.online:  # recent window -> use live ring buffer
                     a, b = cam.make_clip(ts - t0, 0, p, speed)
-                    notes.append("recording off thi; sirf live buffer se clip bani")
+                    notes.append("recording was off; clip made from the live buffer only")
                 else:
                     raise e
         elif next_seconds:
@@ -126,7 +126,7 @@ def get_video_clip(camera=None, last_seconds=None, next_seconds=None, start=None
                     a, b = media.clip_range(cam.id, ts - n, ts, p, speed)
                 except LookupError:
                     a, b = cam.make_clip(28, 0, p, speed)
-                    notes.append("Recording ON nahi thi, isliye sirf pichhle ~28 sec mil paaye")
+                    notes.append("Recording was not on, so only the last ~28 seconds were available")
             else:
                 a, b = cam.make_clip(n, 0, p, speed)
         m = register_media("clip", p, cam.id, f"{cam.name} — {_since_label(a, b)}", {"speed": speed})
@@ -169,7 +169,7 @@ def count_objects(camera=None, label=None, start=None, end=None):
         if label:
             tot = {label: tot.get(label, 0)}
         return {"mode": "live", "total": tot, "per_camera": per,
-                "message": "Abhi: " + (", ".join(f"{v} {k}" for k, v in tot.items()) or "koi object nahi dikha")}
+                "message": "Right now: " + (", ".join(f"{v} {k}" for k, v in tot.items()) or "no objects visible")}
     t1 = parse_time(end) if end else time.time()
     t0 = parse_time(start) if start else t1 - 3600
     ids = [c.id for c in cams]
@@ -180,10 +180,10 @@ def count_objects(camera=None, label=None, start=None, end=None):
     peak = rows(f"SELECT label, MAX(total) n FROM (SELECT ts,label,SUM(n) total FROM counts WHERE cam_id IN ({ph}) AND ts BETWEEN ? AND ?{lab} GROUP BY ts,label) GROUP BY label", (*ids, t0, t1, *la))
     cross = rows(f"SELECT label, detail dir, COUNT(*) n FROM events WHERE type='line_cross' AND cam_id IN ({ph}) AND ts BETWEEN ? AND ?{lab} GROUP BY label, detail", (*ids, t0, t1, *la))
     first = q("SELECT MIN(first) f FROM tracks", one=True)["f"]
-    note = "" if first is None or first <= t0 else f"Dhyan: counting data sirf {fmt_ts(first)} se shuru hua hai."
+    note = "" if first is None or first <= t0 else f"Note: counting data only starts from {fmt_ts(first)}."
     return {"mode": "range", "period": _since_label(t0, t1), "unique_counts": {r["label"]: r["n"] for r in uniq},
             "peak_at_once": {r["label"]: r["n"] for r in peak}, "line_crossings": cross, "note": note,
-            "message": f"{_since_label(t0, t1)}: " + (", ".join(f"{r['n']} {r['label']}" for r in uniq) or "kuch nahi mila") + f" {note}"}
+            "message": f"{_since_label(t0, t1)}: " + (", ".join(f"{r['n']} {r['label']}" for r in uniq) or "nothing found") + f" {note}"}
 
 
 @tool("get_activity", "List recent events (motion, object detected, line crossing, camera offline). Filter by camera/type/time.",
@@ -247,7 +247,7 @@ def export_events_csv(start=None, end=None, camera=None):
       {"name": S, "kind": {"type": "string", "enum": ["rtsp", "url", "webcam", "file", "demo"]}, "source": S, "location": S}, required=["name", "kind"])
 def add_camera(name, kind, source="", location=""):
     c = manager.add(name, kind, source, {"location": location} if location else {})
-    return {"message": f"Camera '{c.name}' (id {c.id}) add ho gaya", "camera": c.status()}
+    return {"message": f"Camera '{c.name}' (id {c.id}) added", "camera": c.status()}
 
 
 @tool("update_camera", "Rename a camera, change its URL, enable/disable it, set location, detection on/off, sensitivity (0-1), or objects to track.",
@@ -257,14 +257,14 @@ def update_camera(camera, name=None, source=None, enabled=None, location=None, d
     c = manager.get(camera)
     cfg = {k: v for k, v in dict(location=location, detect=detect, sensitivity=sensitivity, labels=labels).items() if v is not None}
     c = manager.update(c.id, name=name, source=source, enabled=enabled, cfg=cfg)
-    return {"message": f"'{c.name}' update ho gaya", "camera": c.status()}
+    return {"message": f"'{c.name}' updated", "camera": c.status()}
 
 
 @tool("remove_camera", "Delete a camera (ask the user to confirm first!). Recordings stay on disk until retention expires.", {"camera": CAM}, required=["camera"])
 def remove_camera(camera):
     c = manager.get(camera)
     manager.remove(c.id)
-    return {"message": f"'{c.name}' hata diya gaya"}
+    return {"message": f"'{c.name}' removed"}
 
 
 @tool("set_recording", "Set recording mode: off, motion (records only when something moves/appears, with pre-roll) or continuous. Optionally set global retention_days.",
@@ -276,7 +276,7 @@ def set_recording(camera, mode, retention_days=None):
         msgs.append(c.name)
     if retention_days:
         set_setting("retention_days", retention_days)
-    return {"message": f"Recording '{mode}' set for: {', '.join(msgs)}" + (f"; retention {retention_days} din" if retention_days else "")}
+    return {"message": f"Recording '{mode}' set for: {', '.join(msgs)}" + (f"; retention {retention_days} days" if retention_days else "")}
 
 
 @tool("set_counting_zone",
@@ -288,7 +288,7 @@ def set_counting_zone(camera, zone=None, line=None, clear_zone=False, clear_line
     cfg = {}
     if zone:
         if len(zone) < 3:
-            raise ValueError("zone mein kam se kam 3 points chahiye")
+            raise ValueError("a zone needs at least 3 points")
         cfg["zone"] = zone
     if line:
         if len(line) != 4:
@@ -299,7 +299,7 @@ def set_counting_zone(camera, zone=None, line=None, clear_zone=False, clear_line
     if clear_line:
         cfg["line"] = None
     manager.update(c.id, cfg=cfg)
-    return {"message": f"'{c.name}' zone/line update ho gayi"}
+    return {"message": f"Zone/line updated for '{c.name}'"}
 
 
 # ------------------------------------------------------------------ automations
@@ -314,7 +314,7 @@ def create_rule(name, trigger, camera=None, label=None, min_count=None, between=
     cfg = {"trigger": trigger, "camera": cam, "label": label, "min_count": min_count, "between": between, "cooldown": cooldown,
            "actions": actions or [{"type": "notify"}]}
     rid = ins("INSERT INTO rules(name,enabled,cfg) VALUES(?,1,?)", (name, json.dumps(cfg)))
-    return {"message": f"Rule '{name}' (id {rid}) ON hai", "rule_id": rid}
+    return {"message": f"Rule '{name}' (id {rid}) is ON", "rule_id": rid}
 
 
 @tool("list_rules", "List automations.")
@@ -326,9 +326,9 @@ def list_rules():
 def update_rule(rule_id, enabled=None, delete=False):
     if delete:
         q("DELETE FROM rules WHERE id=?", (rule_id,))
-        return {"message": "Rule delete ho gaya"}
+        return {"message": "Rule deleted"}
     q("UPDATE rules SET enabled=? WHERE id=?", (int(bool(enabled)), rule_id))
-    return {"message": "Rule update ho gaya"}
+    return {"message": "Rule updated"}
 
 
 @tool("set_notifications", "Configure alert delivery: Telegram bot token + chat id, and/or a webhook URL. Pass empty string to clear.",
@@ -337,14 +337,14 @@ def set_notifications(telegram_token=None, telegram_chat=None, webhook_url=None)
     for k, v in dict(telegram_token=telegram_token, telegram_chat=telegram_chat, webhook_url=webhook_url).items():
         if v is not None:
             set_setting(k, v)
-    return {"message": "Notification settings save ho gayi"}
+    return {"message": "Notification settings saved"}
 
 
 @tool("send_test_alert", "Send a test alert to the app, Telegram and webhook so the user can verify notifications work.")
 def send_test_alert():
     from .rules import notify
-    notify("✅ Test alert — Drishti AI notifications kaam kar rahe hain", speak=True)
-    return {"message": "Test alert bhej diya"}
+    notify("✅ Test alert — Drishti AI notifications are working", speak=True)
+    return {"message": "Test alert sent"}
 
 
 # ------------------------------------------------------------------ organise & customise the app
@@ -353,8 +353,8 @@ def create_folder(name, color="#8b5cf6"):
     try:
         fid = ins("INSERT INTO folders(name,color) VALUES(?,?)", (name, color))
     except Exception:
-        raise ValueError("Is naam ka folder pehle se hai")
-    return {"message": f"Folder '{name}' ban gaya", "folder_id": fid}
+        raise ValueError("A folder with this name already exists")
+    return {"message": f"Folder '{name}' created", "folder_id": fid}
 
 
 @tool("list_media", "List saved photos/videos (newest first). Optional kind (snapshot|clip|event|export) or folder name.",
@@ -389,7 +389,7 @@ def add_dashboard_widget(type, title, camera=None, label="person", color="violet
     cid = None if camera in (None, "", "all") else manager.get(camera).id
     w = {"id": int(time.time() * 1000), "type": type, "title": title, "camera": cid, "label": label, "color": color}
     set_setting("widgets", ws + [w])
-    return {"message": f"Dashboard par '{title}' card add ho gaya", "widget": w}
+    return {"message": f"Added the '{title}' card to the dashboard", "widget": w}
 
 
 @tool("remove_dashboard_widget", "Remove a dashboard card by id or title.", {"widget": S}, required=["widget"])
@@ -397,7 +397,7 @@ def remove_dashboard_widget(widget):
     ws = get_setting("widgets", []) or []
     keep = [w for w in ws if str(w["id"]) != str(widget) and w["title"].lower() != str(widget).lower()]
     set_setting("widgets", keep)
-    return {"message": f"{len(ws) - len(keep)} card hata diya"}
+    return {"message": f"{len(ws) - len(keep)} card(s) removed"}
 
 
 @tool("set_app_setting", "Change app settings: detector (auto|yolo|hog), target_fps (3-25), retention_days, preroll_seconds, segment_seconds, accent (hex color for UI).",
@@ -407,7 +407,7 @@ def set_app_setting(key, value):
     if key != "detector" and key != "accent":
         v = float(value)
     set_setting(key, v)
-    return {"message": f"{key} = {value}" + (" (detector ke liye camera restart ya app restart chahiye)" if key == "detector" else "")}
+    return {"message": f"{key} = {value}" + (" (restart the app for the detector change to apply)" if key == "detector" else "")}
 
 
 @tool("system_status", "Disk usage, number of recordings/photos/events, detector in use, uptime.")
@@ -428,7 +428,7 @@ def system_status():
 def create_plugin(name, description, code):
     r = plugins.propose(name, description, code)
     core.bus.publish({"event": "plugin_pending", "data": r})
-    return {"message": f"Plugin '{r['name']}' tayyar hai — approval ke liye 'Extensions' page par dikh raha hai. Code dekh kar Approve dabaiye.", "pending_plugin": r["name"]}
+    return {"message": f"Plugin '{r['name']}' is ready — review the code on the Extensions page and press Approve.", "pending_plugin": r["name"]}
 
 
 @tool("list_plugins", "List installed/pending plugins.")
@@ -439,7 +439,7 @@ def list_plugins():
 @tool("manage_plugin", "Disable/delete an installed plugin (action=remove).", {"name": S, "action": {"type": "string", "enum": ["remove"]}}, required=["name", "action"])
 def manage_plugin(name, action):
     plugins.remove(name)
-    return {"message": f"Plugin '{name}' hata diya"}
+    return {"message": f"Plugin '{name}' removed"}
 
 
 @tool("read_plugin_code", "Read the source of an existing plugin before modifying it.", {"name": S}, required=["name"])
@@ -447,4 +447,4 @@ def read_plugin_code(name):
     for p in plugins.listing(with_code=True):
         if p["name"] == name:
             return {"code": p.get("code", ""), "status": p["status"]}
-    raise KeyError("plugin nahi mila")
+    raise KeyError("plugin not found")

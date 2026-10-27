@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Drishti AI</string>
+    <string name="title_activity_main">Drishti AI</string>
+    <string name="package_name">com.drishti.ai</string>
+    <string name="custom_url_scheme">com.drishti.ai</string>
+</resources>

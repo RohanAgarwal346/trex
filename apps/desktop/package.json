@@ -1,0 +1,37 @@
+{
+  "name": "drishti-ai-desktop",
+  "productName": "Drishti AI",
+  "version": "1.0.0",
+  "description": "Drishti AI - voice-controlled smart CCTV (desktop)",
+  "main": "main.js",
+  "author": "Drishti AI",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "release": "electron-builder --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0",
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.drishti.ai",
+    "productName": "Drishti AI",
+    "files": ["main.js", "preload.js", "splash.html", "connect.html", "node_modules/**/*", "package.json"],
+    "asarUnpack": ["node_modules/ffmpeg-static/**", "node_modules/ffprobe-static/**"],
+    "extraResources": [
+      { "from": "../../cctv-ai", "to": "cctv-ai", "filter": ["server/**/*.py", "web/**/*", "requirements*.txt", "!**/__pycache__/**"] }
+    ],
+    "win": { "target": ["nsis"] },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "mac": { "target": ["dmg"], "category": "public.app-category.utilities" },
+    "linux": { "target": ["AppImage"], "category": "Utility" },
+    "publish": [{ "provider": "github", "owner": "RohanAgarwal346", "repo": "trex", "releaseType": "release" }]
+  }
+}

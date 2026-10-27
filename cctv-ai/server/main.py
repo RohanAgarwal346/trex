@@ -6,6 +6,7 @@ import hmac
 import json
 import os
 import secrets
+import threading
 import time
 from pathlib import Path
 
@@ -51,7 +52,7 @@ async def auth_mw(request: Request, call_next):
     p = request.url.path
     # Anything reachable from outside the home network MUST be PIN-protected (also blocks DNS-rebinding on localhost).
     if not pin and not _local_host(request.headers.get("host", "")):
-        return JSONResponse({"error": "Remote access ke liye pehle Settings mein PIN lagayein (local network se)."}, status_code=403)
+        return JSONResponse({"error": "Set a PIN in Settings (from your local network) before accessing remotely."}, status_code=403)
     # CSRF guard: state-changing calls must come from our own UI (custom header forces a CORS preflight for other sites).
     if request.method in ("POST", "PUT", "PATCH", "DELETE") and p.startswith("/api") and request.headers.get("x-requested-with") != "drishti":
         return JSONResponse({"error": "bad request origin"}, status_code=403)
@@ -76,7 +77,7 @@ def login(resp: Response, body: dict = Body(...)):
     pin = get_setting("pin")
     if pin and not hmac.compare_digest(str(body.get("pin", "")), pin):
         time.sleep(1)
-        raise HTTPException(401, "Galat PIN")
+        raise HTTPException(401, "Wrong PIN")
     resp.set_cookie("dt", _token(pin or ""), httponly=True, samesite="strict", max_age=86400 * 30)
     return {"ok": True}
 
@@ -109,7 +110,7 @@ def test_camera(body: dict = Body(...)):
     cap = cv2.VideoCapture(int(src) if body["kind"] == "webcam" else src)
     ok, fr = (cap.read() if cap.isOpened() else (False, None))
     cap.release()
-    return {"ok": bool(ok), "error": "" if ok else "Connect nahi hua — URL/IP/password check kijiye", "size": list(fr.shape[1::-1]) if ok else None}
+    return {"ok": bool(ok), "error": "" if ok else "Could not connect — check the URL, IP and password", "size": list(fr.shape[1::-1]) if ok else None}
 
 
 @app.post("/api/cameras")
@@ -241,7 +242,7 @@ def settings_get():
 @app.put("/api/settings")
 def settings_put(body: dict = Body(...)):
     allowed = {"model", "retention_days", "detector", "target_fps", "preroll_seconds", "segment_seconds", "telegram_chat", "webhook_url",
-               "anthropic_key", "telegram_token", "pin", "accent"}
+               "anthropic_key", "telegram_token", "pin", "accent", "stt_model"}
     for k, v in body.items():
         if k in allowed and v is not None:
             if k in SECRET_KEYS and v == "":
@@ -250,6 +251,39 @@ def settings_put(body: dict = Body(...)):
     if body.get("clear_pin"):
         set_setting("pin", "")
     return {"ok": True}
+
+
+# ---------------- speech-to-text (desktop/Android shells can't use the browser's built-in recognizer)
+_stt = {"model": None, "lock": threading.Lock()}
+
+
+@app.post("/api/transcribe")
+async def transcribe(request: Request):
+    audio = await request.body()
+    if not audio or len(audio) > 12_000_000:
+        raise HTTPException(400, "No audio received (or too large)")
+
+    def work():
+        import tempfile
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError:
+            raise HTTPException(501, "Offline voice is not installed. Run: pip install faster-whisper")
+        with _stt["lock"]:
+            if _stt["model"] is None:
+                try:
+                    _stt["model"] = WhisperModel(get_setting("stt_model", "base.en"), device="cpu", compute_type="int8")
+                except Exception as e:  # noqa
+                    raise HTTPException(503, f"Could not load the speech model (first run needs internet): {e}")
+            with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as f:
+                f.write(audio)
+            try:
+                segs, _ = _stt["model"].transcribe(f.name, language="en", vad_filter=True, beam_size=1)
+                return " ".join(s.text.strip() for s in segs).strip()
+            finally:
+                Path(f.name).unlink(missing_ok=True)
+    text = await asyncio.get_event_loop().run_in_executor(None, work)
+    return {"text": text}
 
 
 # ---------------- AI chat & plugins

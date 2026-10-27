@@ -2,6 +2,7 @@
 import json
 import os
 import random
+import re
 import subprocess
 import threading
 import time
@@ -185,7 +186,7 @@ class Camera:
         src = int(self.source) if self.kind == "webcam" else self.source
         cap = cv2.VideoCapture(src)
         if not cap.isOpened():
-            self.error = "Camera se connect nahi ho paya / could not connect"
+            self.error = "Could not connect to the camera"
             return False
         self.source_obj = cap
         return True
@@ -237,7 +238,7 @@ class Camera:
         if on:
             self._offline_since = None
             if not self.online and self._was_online:
-                self.mgr.record_event(self, "camera_online", "camera", 1, "Camera wapas online", snap=False)
+                self.mgr.record_event(self, "camera_online", "camera", 1, "Camera is back online", snap=False)
             self.online, self._was_online, self.error = True, True, ""
         else:
             if self._offline_since is None:
@@ -245,7 +246,7 @@ class Camera:
             if self.online and time.time() - self._offline_since > 0:
                 self.online = False
                 if self._was_online:
-                    self.mgr.record_event(self, "camera_offline", "camera", 1, self.error or "Camera offline ho gaya", snap=False)
+                    self.mgr.record_event(self, "camera_offline", "camera", 1, self.error or "Camera went offline", snap=False)
 
     # ----- per-frame processing
     def _on_frame(self, frame, now):
@@ -339,7 +340,7 @@ class Camera:
             t["db"] = tid
             if self._cooled("obj:" + t["label"], 12):
                 n = self.counts_now().get(t["label"], 1)
-                self.mgr.record_event(self, "object", t["label"], n, f"{t['label']} dikha ({n} abhi frame mein)")
+                self.mgr.record_event(self, "object", t["label"], n, f"{t['label']} detected ({n} in frame now)")
         for t in ended:
             if t.get("db"):
                 q("UPDATE tracks SET last=? WHERE id=?", (t["last"], t["db"]))
@@ -426,7 +427,7 @@ class Camera:
     def snapshot_image(self, annotate=True, details=False, crop=None):
         frame = self.wait_frame()
         if frame is None:
-            raise RuntimeError(f"'{self.name}' abhi offline hai ({self.error or 'no frame'})")
+            raise RuntimeError(f"'{self.name}' is offline right now ({self.error or 'no frame'})")
         counts = self.counts_now()
         if annotate:
             note = f"motion: {'YES' if self.motion_on else 'no'} ({self.motion.ratio * 100:.1f}%)" if details else ""
@@ -452,7 +453,7 @@ class Camera:
             job["done"].wait(post + 8)
         frames = job["frames"]
         if len(frames) < 2:
-            raise RuntimeError("Is camera se abhi footage nahi mil rahi (offline?)")
+            raise RuntimeError("No live footage available from this camera (offline?)")
         dur = max(0.5, frames[-1][0] - frames[0][0])
         fps = len(frames) / dur
         f0 = cv2.imdecode(np.frombuffer(frames[0][1], np.uint8), cv2.IMREAD_COLOR)
@@ -487,16 +488,16 @@ def validate_source(kind, source):
         return ""
     if kind == "webcam":
         if not str(source).isdigit():
-            raise ValueError("Webcam source ek number hona chahiye (0, 1, ...)")
+            raise ValueError("Webcam source must be a number (0, 1, ...)")
         return str(source)
     if kind == "file":
         p = Path(source).expanduser()
         if not p.is_file():
-            raise ValueError(f"File nahi mili: {source}")
+            raise ValueError(f"File not found: {source}")
         return str(p)
     if kind in ("rtsp", "url"):
         if not str(source).lower().startswith(ALLOWED_SCHEMES):
-            raise ValueError("URL rtsp://, http:// ya https:// se shuru hona chahiye")
+            raise ValueError("URL must start with rtsp://, http:// or https://")
         return str(source)
     raise ValueError(f"Unknown camera type: {kind}")
 
@@ -510,9 +511,12 @@ class Manager:
 
     def load(self):
         if not q("SELECT 1 FROM cameras LIMIT 1"):
-            self.add("Demo Gate / डेमो गेट", "demo", "", {"rec_mode": "off", "line": [0.5, 0.6, 0.5, 0.9]})
-            self.add("Demo Parking / डेमो पार्किंग", "demo", "", {})
+            self.add("Demo Gate", "demo", "", {"rec_mode": "off", "line": [0.5, 0.6, 0.5, 0.9]})
+            self.add("Demo Parking", "demo", "", {})
         for r in rows("SELECT * FROM cameras"):
+            if re.search(r"[\u0900-\u097F]", r["name"]):   # older installs had bilingual demo names; the app is English-only
+                r["name"] = re.sub(r"\s*/?\s*[\u0900-\u097F ]+$", "", r["name"]).strip() or "Camera"
+                q("UPDATE cameras SET name=? WHERE id=?", (r["name"], r["id"]))
             self._spawn(r)
         threading.Thread(target=self._janitor, daemon=True).start()
 
@@ -551,11 +555,11 @@ class Manager:
         q("DELETE FROM cameras WHERE id=?", (cid,))
 
     def get(self, ref):
-        """Find a camera by id, exact/partial name (Hindi or English) or 1-based index."""
+        """Find a camera by id, exact/partial name (English) or 1-based index."""
         if ref is None or ref == "":
             if len(self.cams) == 1:
                 return next(iter(self.cams.values()))
-            raise KeyError("Kaun sa camera? " + ", ".join(f"{c.id}:{c.name}" for c in self.cams.values()))
+            raise KeyError("Which camera? " + ", ".join(f"{c.id}:{c.name}" for c in self.cams.values()))
         if isinstance(ref, int) or str(ref).isdigit():
             if int(ref) in self.cams:
                 return self.cams[int(ref)]
@@ -570,7 +574,7 @@ class Manager:
             loc = (c.cfg.get("location") or "").lower()
             if loc and (s in loc or loc in s):
                 return c
-        raise KeyError(f"Camera '{ref}' nahi mila. Available: " + ", ".join(f"{c.id}:{c.name}" for c in self.cams.values()))
+        raise KeyError(f"Camera '{ref}' not found. Available: " + ", ".join(f"{c.id}:{c.name}" for c in self.cams.values()))
 
     def all(self):
         return list(self.cams.values())
