@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080818">
+<title>दृष्टि AI — Smart CCTV</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%238b5cf6'/%3E%3Ctext x='50' y='68' font-size='56' text-anchor='middle'%3E👁%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="logo"><div class="mark">👁️</div><div><b>दृष्टि AI</b><small>Smart CCTV · Voice + AI</small></div></div>
+    <nav id="nav"></nav>
+    <div class="side-foot" id="sidefoot">…</div>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<button id="orb" title="AI se baat karein">🎙️</button>
+<section id="chat">
+  <header>
+    <div class="av">✨</div>
+    <div style="flex:1"><b>दृष्टि AI</b><small id="aistate">Bolo ya likho</small></div>
+    <button class="btn sm" id="lang" title="Voice language">हिं</button>
+    <button class="btn sm" id="tts" title="Jawab bolkar sunao">🔊</button>
+    <button class="btn sm" id="clear" title="Chat saaf karo">🗑️</button>
+    <button class="btn sm" id="close">✕</button>
+  </header>
+  <div id="msgs"></div>
+  <div id="chips"></div>
+  <div id="composer">
+    <button id="mic" title="Bolne ke liye dabayein">🎤</button>
+    <input id="inp" placeholder="जैसे: गेट का फोटो दो…" autocomplete="off">
+    <button id="send">➤</button>
+  </div>
+</section>
+<div id="toasts"></div>
+<div id="login" hidden>
+  <div class="card" style="width:min(380px,92vw);text-align:center">
+    <div class="logo" style="justify-content:center"><div class="mark">🔐</div></div>
+    <h2>दृष्टि AI</h2><p class="hint" style="margin:6px 0 14px">PIN daaliye</p>
+    <input id="pin" type="password" inputmode="numeric" placeholder="••••" style="text-align:center;font-size:22px;letter-spacing:8px">
+    <button class="btn p" style="width:100%;justify-content:center;margin-top:14px" id="pinGo">Kholo</button>
+    <p class="hint" id="pinErr" style="color:#fda4af;margin-top:8px"></p>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

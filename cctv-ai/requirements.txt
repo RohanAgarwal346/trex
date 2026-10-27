@@ -1,0 +1,8 @@
+fastapi>=0.110
+uvicorn>=0.29
+opencv-python-headless>=4.9
+numpy
+httpx
+anthropic>=0.40
+# optional, much better detection (people, vehicles, animals): pip install ultralytics
+pillow
