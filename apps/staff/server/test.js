@@ -2,7 +2,8 @@
 // End-to-end smoke test: node --disable-warning=ExperimentalWarning test.js
 process.env.DB_FILE = ':memory:'; process.env.ADMIN_PASSWORD = 'adminpw'; process.env.DATA_DIR = require('node:os').tmpdir();
 const assert = require('node:assert/strict');
-const { server, haversine } = require('./server.js');
+const { server, haversine, drainOutbox, db } = require('./server.js');
+const http = require('node:http');
 (async () => {
   await new Promise((r) => server.listen(0, r)); const base = `http://127.0.0.1:${server.address().port}`;
   const call = async (method, p, body, token, hdr = {}) => { const r = await fetch(base + p, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}), ...hdr }, body: body ? JSON.stringify(body) : undefined }); const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; } return { s: r.status, j }; };
@@ -48,5 +49,30 @@ const { server, haversine } = require('./server.js');
   assert.equal((await call('POST', '/api/login', { mobile: '9876543210', pin: '4321', deviceId: 'd2' })).s, 200);
   for (let i = 0; i < 5; i++) await call('POST', '/api/login', { mobile: '9876543210', pin: '1111', deviceId: 'd2' });
   assert.equal((await call('POST', '/api/login', { mobile: '9876543210', pin: '4321', deviceId: 'd2' })).s, 429);
+  // ---- connectors / outbox / orders ----
+  const got = []; let failNext = false;
+  const ext = http.createServer((req, res) => { let b = ''; req.on('data', (c) => (b += c)); req.on('end', () => { got.push({ key: req.headers['x-hub-key'], body: JSON.parse(b) }); res.writeHead(failNext ? 500 : 200, { 'content-type': 'application/json' }); res.end(JSON.stringify(failNext ? { ok: false, error: 'boom' } : { ok: true })); }); });
+  await new Promise((r) => ext.listen(0, r)); const eu = `http://127.0.0.1:${ext.address().port}`;
+  const T2 = (await call('POST', '/api/login', { mobile: '9876543210', pin: '4321', deviceId: 'd2' })).s === 429 ? null : null; // locked above; use admin to unlock
+  await call('PUT', `/api/admin/staff/${sid}`, { pin: '5555' }, A);
+  const T3 = (await call('POST', '/api/login', { mobile: '9876543210', pin: '5555', deviceId: 'd2' })).j.token;
+  assert.equal((await call('PUT', '/api/admin/settings', { connectors: { attendance: { url: eu, secret: 's1' }, receipt: { url: eu, secret: 's2' }, order: { url: eu, secret: 's3' } } }, A)).s, 200);
+  assert.equal((await call('PUT', '/api/admin/settings', { connectors: { order: { url: 'ftp://x' } } }, A)).s, 400);
+  assert.equal((await call('GET', '/api/bridge/pending', null, null, H)).j.receipts.length, 0); // connector owns receipts now
+  assert.equal((await call('POST', '/api/attendance', { type: 'in', ...off(10), accuracy: 5 }, T3)).s, 200);
+  const rr = await call('POST', '/api/receipts', { client_id: 'k1', party: 'Ram Traders', amount: 100, mode: 'cash' }, T3);
+  const oo = await call('POST', '/api/orders', { client_id: 'o1', party: 'Ram Traders', items: [{ name: 'Sugar 50kg', qty: 10, rate: 2100 }] }, T3); assert.equal(oo.s, 200);
+  assert.equal((await call('POST', '/api/orders', { client_id: 'o2', party: 'Ram Traders', items: [] }, T3)).s, 400);
+  await drainOutbox();
+  assert.deepEqual(got.map((g) => g.body.module + ':' + g.key).sort(), ['attendance:s1', 'order:s3', 'receipt:s2']);
+  assert.equal(got.find((g) => g.body.module === 'receipt').body.event_id, 'rc-' + rr.j.receipt.id);
+  assert.equal((await call('GET', '/api/receipts', null, T3)).j[0].status, 'synced');
+  assert.equal((await call('GET', '/api/orders', null, T3)).j[0].status, 'synced');
+  failNext = true; await call('POST', '/api/receipts', { client_id: 'k2', party: 'Ram Traders', amount: 5, mode: 'upi' }, T3); await drainOutbox();
+  const rl = (await call('GET', '/api/receipts', null, T3)).j[0]; assert.equal(rl.status, 'pending'); assert.match(rl.error, /boom/);
+  failNext = false; db.prepare("UPDATE outbox SET next_try=0").run(); await drainOutbox();
+  assert.equal((await call('GET', '/api/receipts', null, T3)).j[0].status, 'synced');
+  assert.equal((await call('GET', '/api/admin/outbox', null, A)).s, 200);
+  ext.close();
   console.log('ALL TESTS PASSED'); server.close(); process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });

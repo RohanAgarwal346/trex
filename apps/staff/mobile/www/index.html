@@ -15,7 +15,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .hdr h1{margin:0;font-size:21px;line-height:1.2}.hdr small{opacity:.9;font-size:14px}
 main{flex:1;overflow-y:auto;padding:16px 16px 24px;-webkit-overflow-scrolling:touch}
 nav{display:flex;background:#fff;border-top:1px solid #e5e7eb;padding-bottom:var(--bot);box-shadow:0 -4px 16px #0001}
-nav button{flex:1;border:0;background:none;padding:9px 0 8px;font-size:12.5px;color:var(--mut);font-weight:600}
+nav button{flex:1;border:0;background:none;padding:9px 0 8px;font-size:12px;color:var(--mut);font-weight:600}
 nav button span{display:block;font-size:24px;line-height:1.2}
 nav button.on{color:var(--p1)}nav button.on span{transform:scale(1.15)}
 .card{background:var(--card);border-radius:22px;padding:18px;margin-bottom:14px;box-shadow:0 4px 18px #4c1d9511}
@@ -106,8 +106,8 @@ let flushing = false;
 async function flushQueue() {
   if (flushing || !token) return; flushing = true;
   try { let q = getQ(); const keep = [];
-    for (const r of q) { try { await api('/api/receipts', 'POST', r); } catch (e) { if (e instanceof NetErr) { keep.push(r); } else { toast('Receipt for ' + r.party + ' rejected: ' + e.message); } } }
-    setQ(keep); if (keep.length < q.length) { toast((q.length - keep.length) + ' saved receipt(s) sent ✔'); if (tab === 'receipt' || tab === 'hist') render(); }
+    for (const r of q) { try { await api('/api/' + (r._k || 'receipts'), 'POST', r); } catch (e) { if (e instanceof NetErr) { keep.push(r); } else { toast((r._k === 'orders' ? 'Order' : 'Receipt') + ' for ' + r.party + ' rejected: ' + e.message); } } }
+    setQ(keep); if (keep.length < q.length) { toast((q.length - keep.length) + ' saved receipt(s) sent ✔'); if (tab === 'receipt' || tab === 'order' || tab === 'hist') render(); }
   } finally { flushing = false; }
 }
 addEventListener('online', flushQueue); setInterval(flushQueue, 30000);
@@ -136,7 +136,7 @@ function viewLogin() {
 async function loadMe() { me = await api('/api/me'); }
 
 function shell(title, sub, body) {
-  const nav = [['home', '📍', 'हाज़िरी'], ['receipt', '💰', 'रसीद'], ['hist', '📋', 'इतिहास'], ['me', '👤', 'प्रोफाइल']];
+  const nav = [['home', '📍', 'हाज़िरी'], ['receipt', '💰', 'रसीद'], ['order', '🛒', 'ऑर्डर'], ['hist', '📋', 'इतिहास'], ['me', '👤', 'प्रोफाइल']];
   $app.innerHTML = `<div class="hdr"><img src="logo.png" alt=""><div><h1>${esc(title)}</h1><small>${esc(sub)}</small></div></div><main id="main">${body}</main>
   <nav>${nav.map(([k, i, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}"><span>${i}</span>${l}</button>`).join('')}</nav>`;
   $app.querySelectorAll('nav button').forEach((b) => (b.onclick = () => { tab = b.dataset.t; render(); }));
@@ -168,7 +168,7 @@ async function refreshPos() { posErr = ''; const b = document.getElementById('re
 // ---- receipt form ----
 let form = null; const newForm = () => ({ client_id: uuid(), party: '', amount: '', mode: 'cash', bills: [], narration: '' });
 function viewReceipt() {
-  form = form || newForm(); const q = getQ().length;
+  form = form || newForm(); const q = getQ().filter((x) => x._k !== 'orders').length;
   shell('रसीद / Receipt', 'ग्राहक से पेमेंट लिया → Tally में अपने आप', `
   ${q ? `<div class="err">⏳ ${q} receipt(s) saved on phone — will send when internet is back</div>` : ''}
   <div class="card"><label style="margin-top:0">ग्राहक / Customer</label><input id="party" autocomplete="off" placeholder="${me.parties_synced ? 'Type name to search…' : 'Customer name'}" value="${esc(form.party)}"><div id="sug"></div>
@@ -197,19 +197,51 @@ async function submitReceipt() {
   const payload = { client_id: form.client_id, party: form.party.trim(), amount, mode: form.mode, narration: form.narration.trim(), bills: form.bills.filter((b) => b.ref || b.amount).map((b) => ({ ref: b.ref.trim(), amount: parseFloat(String(b.amount).replace(/,/g, '')) })), ...loc };
   try { const r = await api('/api/receipts', 'POST', payload); form = null; toast(`Receipt saved ✔ ${inr(amount)} · ${payload.party}`); tab = 'hist'; histTab = 'rc'; render(); }
   catch (e) {
-    if (e instanceof NetErr) { setQ([...getQ(), payload]); form = null; toast('No internet — saved on phone, will send automatically'); tab = 'hist'; histTab = 'rc'; render(); }
+    if (e instanceof NetErr) { setQ([...getQ(), { ...payload, _k: 'receipts' }]); form = null; toast('No internet — saved on phone, will send automatically'); tab = 'hist'; histTab = 'rc'; render(); }
     else { msg.innerHTML = `<div class="err">${esc(e.message)}</div>`; btn.disabled = false; btn.textContent = '✔ रसीद सेव करें / Save Receipt'; }
   }
 }
 
+let oform = null; const newOForm = () => ({ client_id: uuid(), party: '', items: [{ name: '', qty: '', rate: '' }], note: '' });
+function viewOrder() {
+  oform = oform || newOForm(); const q = getQ().filter((x) => x._k === 'orders').length;
+  shell('ऑर्डर / Order', 'ग्राहक का ऑर्डर लिखें → सीधा सिस्टम में', `
+  ${q ? `<div class="err">⏳ ${q} order(s) saved on phone — will send when internet is back</div>` : ''}
+  <div class="card"><label style="margin-top:0">ग्राहक / Customer</label><input id="oparty" autocomplete="off" placeholder="${me.parties_synced ? 'Type name to search…' : 'Customer name'}" value="${esc(oform.party)}"><div id="osug"></div>
+  <label>माल / Items</label><div id="items">${oform.items.map((b, i) => `<div class="billrow" style="flex-wrap:wrap"><input style="flex:1 1 100%" data-i="${i}" data-f="name" placeholder="Item name" value="${esc(b.name)}"><input data-i="${i}" data-f="qty" inputmode="decimal" placeholder="Qty" value="${esc(b.qty)}"><input data-i="${i}" data-f="rate" inputmode="decimal" placeholder="Rate ₹ (optional)" value="${esc(b.rate)}">${oform.items.length > 1 ? `<button data-del="${i}">✕</button>` : ''}</div>`).join('')}</div>
+  <button class="ghost" id="additem">+ माल जोड़ें / Add item</button>
+  <label>नोट / Note <span class="mut">(optional)</span></label><input id="onote" placeholder="e.g. delivery date" value="${esc(oform.note)}">
+  <div id="omsg"></div><button class="pri" style="margin-top:18px" id="osubmit">✔ ऑर्डर भेजें / Send Order</button></div>`);
+  const $ = (id) => document.getElementById(id); let st;
+  $('oparty').oninput = (e) => { oform.party = e.target.value; clearTimeout(st); st = setTimeout(async () => { if (!me.parties_synced || !oform.party) { $('osug').innerHTML = ''; return; } try { const l = await api('/api/parties?q=' + encodeURIComponent(oform.party)); $('osug').innerHTML = l.length ? `<div class="sug">${l.map((n) => `<div data-n="${esc(n)}">${esc(n)}</div>`).join('')}</div>` : '<div class="mut" style="margin-top:6px">Not found in Tally</div>'; $('osug').querySelectorAll('[data-n]').forEach((d) => (d.onclick = () => { oform.party = d.dataset.n; $('oparty').value = oform.party; $('osug').innerHTML = ''; })); } catch {} }, 250); };
+  $('onote').oninput = (e) => (oform.note = e.target.value);
+  document.querySelectorAll('#items input').forEach((i) => (i.oninput = (e) => (oform.items[+i.dataset.i][i.dataset.f] = e.target.value)));
+  document.querySelectorAll('#items [data-del]').forEach((b) => (b.onclick = () => { oform.items.splice(+b.dataset.del, 1); render(); }));
+  $('additem').onclick = () => { oform.items.push({ name: '', qty: '', rate: '' }); render(); };
+  $('osubmit').onclick = async () => {
+    const btn = $('osubmit'), msg = $('omsg'); msg.innerHTML = '';
+    const items = oform.items.filter((i) => i.name.trim() || i.qty).map((i) => ({ name: i.name.trim(), qty: parseFloat(i.qty), rate: i.rate === '' ? null : parseFloat(i.rate) }));
+    if (!oform.party.trim()) return (msg.innerHTML = '<div class="err">ग्राहक चुनें / Choose the customer</div>');
+    if (!items.length || items.some((i) => !i.name || !(i.qty > 0))) return (msg.innerHTML = '<div class="err">माल का नाम और मात्रा डालें / Enter item name and quantity</div>');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    const payload = { client_id: oform.client_id, party: oform.party.trim(), items, note: oform.note.trim() };
+    try { await api('/api/orders', 'POST', payload); oform = null; toast('Order sent ✔'); tab = 'hist'; histTab = 'od'; render(); }
+    catch (e) { if (e instanceof NetErr) { setQ([...getQ(), { ...payload, _k: 'orders' }]); oform = null; toast('No internet — saved on phone, will send automatically'); tab = 'hist'; histTab = 'od'; render(); } else { msg.innerHTML = `<div class="err">${esc(e.message)}</div>`; btn.disabled = false; btn.textContent = '✔ ऑर्डर भेजें / Send Order'; } }
+  };
+}
+
 async function viewHist() {
-  shell('इतिहास / History', 'आपकी हाज़िरी और रसीदें', `<div class="tabs"><button data-h="att" class="${histTab === 'att' ? 'on' : ''}">📍 हाज़िरी</button><button data-h="rc" class="${histTab === 'rc' ? 'on' : ''}">💰 रसीद</button></div><div id="list" class="card"><div class="mut">Loading…</div></div>`);
+  shell('इतिहास / History', 'आपकी हाज़िरी और रसीदें', `<div class="tabs"><button data-h="att" class="${histTab === 'att' ? 'on' : ''}">📍 हाज़िरी</button><button data-h="rc" class="${histTab === 'rc' ? 'on' : ''}">💰 रसीद</button><button data-h="od" class="${histTab === 'od' ? 'on' : ''}">🛒 ऑर्डर</button></div><div id="list" class="card"><div class="mut">Loading…</div></div>`);
   document.querySelectorAll('[data-h]').forEach((b) => (b.onclick = () => { histTab = b.dataset.h; render(); }));
   const L = document.getElementById('list');
   try {
     if (histTab === 'att') { const rows = await api('/api/attendance'); L.innerHTML = rows.map((r) => `<div class="row"><div><span class="badge b-${r.type}">${r.type === 'in' ? 'IN' : 'OUT'}</span> <span class="mut">${esc(r.godown)}</span></div><b>${fmtDate(r.ts)} · ${fmtTime(r.ts)}</b></div>`).join('') || '<div class="mut">इस महीने कोई हाज़िरी नहीं</div>'; }
-    else {
-      const queued = getQ().map((r) => `<div class="row"><div><b>${esc(r.party)}</b><div class="mut">${esc(r.mode)}</div></div><div style="text-align:right"><div class="amt">${inr(r.amount)}</div><span class="badge b-pending">📲 phone पर सेव</span></div></div>`).join('');
+    else if (histTab === 'od') {
+      const queued = getQ().filter((r) => r._k === 'orders').map((r) => `<div class="row"><div><b>${esc(r.party)}</b><div class="mut">${r.items.length} item(s)</div></div><span class="badge b-pending">📲 phone पर सेव</span></div>`).join('');
+      const rows = await api('/api/orders'); const lab = { pending: '⏳ भेजना बाकी', synced: '✔ भेज दिया', failed: '✖ error' };
+      L.innerHTML = queued + (rows.map((r) => { const it = JSON.parse(r.items); return `<div class="row"><div><b>${esc(r.party)}</b><div class="mut">${fmtDate(r.ts)} · ${it.map((i) => esc(i.name) + ' × ' + i.qty).join(', ')}</div>${r.error ? `<div class="mut" style="color:#b91c1c">${esc(r.error)}</div>` : ''}</div><span class="badge b-${r.status}">${lab[r.status] || r.status}</span></div>`; }).join('') || (queued ? '' : '<div class="mut">अभी कोई ऑर्डर नहीं</div>'));
+    } else {
+      const queued = getQ().filter((r) => r._k !== 'orders').map((r) => `<div class="row"><div><b>${esc(r.party)}</b><div class="mut">${esc(r.mode)}</div></div><div style="text-align:right"><div class="amt">${inr(r.amount)}</div><span class="badge b-pending">📲 phone पर सेव</span></div></div>`).join('');
       const rows = await api('/api/receipts');
       const lab = { pending: '⏳ Tally का इंतज़ार', synced: '✔ Tally में गया', failed: '✖ Tally error' };
       L.innerHTML = queued + (rows.map((r) => `<div class="row"><div><b>${esc(r.party)}</b><div class="mut">${fmtDate(r.ts)} · ${esc(r.mode)}${r.voucher_no ? ' · #' + esc(r.voucher_no) : ''}</div>${r.error ? `<div class="mut" style="color:#b91c1c">${esc(r.error)}</div>` : ''}</div><div style="text-align:right"><div class="amt">${inr(r.amount)}</div><span class="badge b-${r.status}">${lab[r.status]}</span></div></div>`).join('') || (queued ? '' : '<div class="mut">अभी कोई रसीद नहीं</div>'));
@@ -231,7 +263,7 @@ function render() {
   if (!SERVER) return viewSetup();
   if (!token) return viewLogin();
   if (!me) { $app.innerHTML = '<div class="login"><div class="box"><img src="logo.png" alt=""><h2>Rohpo Staff</h2><p>Loading…</p></div></div>'; loadMe().then(() => { render(); flushQueue(); refreshPos(); }).catch((e) => { if (token) $app.innerHTML = `<div class="login"><div class="box"><img src="logo.png" alt=""><div class="err">${esc(e.message)}</div><button class="pri" onclick="location.reload()">Retry</button></div></div>`; }); return; }
-  ({ home: viewHome, receipt: viewReceipt, hist: viewHist, me: viewMe })[tab]();
+  ({ home: viewHome, receipt: viewReceipt, order: viewOrder, hist: viewHist, me: viewMe })[tab]();
 }
 render();
 if (window.Capacitor?.Plugins?.App) window.Capacitor.Plugins.App.addListener?.('resume', () => { if (token && tab === 'home') refreshPos(); flushQueue(); });

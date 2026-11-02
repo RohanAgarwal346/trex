@@ -6,6 +6,7 @@ Staff Android app + owner admin panel + Tally connector.
 |---|---|---|
 | Server + admin panel | `server/` | Staff login (mobile + PIN), 100 m godown geofence attendance, receipts queue, CSV export, webhook |
 | Android app | `mobile/` | What staff install (APK). Built by GitHub Actions: **Actions → Build Rohpo Staff APK** |
+| Hub connectors | Admin → Settings | Forwards every punch / receipt / order to Attendance Pro / Tally Live (see `CONNECT_MESSAGE.md`) |
 | Tally bridge | `tally-bridge/` | Runs on the Tally PC; pushes receipts into Tally, loads customer list from Tally |
 
 ## 1. Run the server (needs a public HTTPS address so staff phones can reach it)
@@ -26,7 +27,10 @@ GitHub → Actions → **Build Rohpo Staff APK** → Run workflow, type your ser
 `keytool -genkeypair -keystore ropo.jks -alias ropo -keyalg RSA -keysize 2048 -validity 10000`
 then add GitHub repo secrets `ANDROID_KEYSTORE_B64` (`base64 -w0 ropo.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Without them the APK is debug-signed and must be uninstalled before installing a newer one.
 
-## 3. Connect Tally
+## 3. Connectors (Attendance Pro, Tally Live)
+In Admin → Settings → *Connectors* put the URL + secret of the receiver for each job (attendance, receipt, order). The hub sends JSON with header `x-hub-key` and retries until the receiver says OK. `CONNECT_MESSAGE.md` has the exact payloads to give to the session that owns Attendance Pro / Tally Live. New job types (stock, expenses...) are added the same way: a table + `enqueue(module, ...)`.
+
+## 4. Or connect Tally directly (bridge)
 On the Tally PC: F1 → Settings → Connectivity → Tally acts as **Both**, port 9000, company open. Copy `tally-bridge/config.example.json` to `config.json`, fill serverUrl + bridgeKey, run `start-bridge.bat`.
 
 ## Logo

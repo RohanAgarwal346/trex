@@ -25,6 +25,11 @@ CREATE TABLE IF NOT EXISTS receipts(id INTEGER PRIMARY KEY, client_id TEXT NOT N
   error TEXT, voucher_no TEXT, synced_at INTEGER, UNIQUE(staff_id, client_id));
 CREATE INDEX IF NOT EXISTS rc_status ON receipts(status);
 CREATE TABLE IF NOT EXISTS ledgers(name TEXT PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY, client_id TEXT NOT NULL, staff_id INTEGER NOT NULL, ts INTEGER NOT NULL, odate TEXT NOT NULL, party TEXT NOT NULL,
+  items TEXT NOT NULL, note TEXT, status TEXT NOT NULL DEFAULT 'pending', error TEXT, UNIQUE(staff_id, client_id));
+CREATE TABLE IF NOT EXISTS outbox(id INTEGER PRIMARY KEY, module TEXT NOT NULL, ref_id INTEGER, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+  attempts INTEGER NOT NULL DEFAULT 0, next_try INTEGER NOT NULL DEFAULT 0, error TEXT, created INTEGER NOT NULL, done INTEGER);
+CREATE INDEX IF NOT EXISTS ob_status ON outbox(status, next_try);
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, staff_id INTEGER, role TEXT NOT NULL, expires INTEGER NOT NULL);
 `);
@@ -38,6 +43,10 @@ if (!ADMIN_PASSWORD) { ADMIN_PASSWORD = rand(9); setSetting('admin_password', AD
 let BRIDGE_KEY = getSetting('bridge_key'); if (!BRIDGE_KEY) { BRIDGE_KEY = rand(18); setSetting('bridge_key', BRIDGE_KEY); }
 const DEFAULT_MODE_LEDGERS = { cash: 'Cash', upi: 'Bank Account', bank: 'Bank Account', cheque: 'Bank Account' };
 const modeLedgers = () => { try { return { ...DEFAULT_MODE_LEDGERS, ...JSON.parse(getSetting('mode_ledgers', '{}')) }; } catch { return DEFAULT_MODE_LEDGERS; } };
+
+// Connectors: where each module's events are forwarded (e.g. Attendance Pro, Tally Live). Empty URL = module stays inside the hub.
+const MODULES = ['attendance', 'receipt', 'order'];
+const connectors = () => { try { const c = JSON.parse(getSetting('connectors', '{}')); return Object.fromEntries(MODULES.map((m) => [m, { url: str(c[m]?.url, 400), secret: str(c[m]?.secret, 200) }])); } catch { return Object.fromEntries(MODULES.map((m) => [m, { url: '', secret: '' }])); } };
 
 // ---------- helpers ----------
 const IST = 19800000;
@@ -103,7 +112,7 @@ route('POST', '/api/login', 'public', ({ body }) => {
 route('GET', '/api/me', 'staff', ({ user }) => ({
   staff: staffPublic(user.staff), today: todayStatus(user.staff.id),
   godowns: db.prepare('SELECT id,name,lat,lng,radius_m FROM godowns WHERE active=1 AND lat IS NOT NULL').all(),
-  modes: Object.keys(modeLedgers()), parties_synced: db.prepare('SELECT COUNT(*) c FROM ledgers').get().c > 0,
+  modes: Object.keys(modeLedgers()), modules: MODULES, parties_synced: db.prepare('SELECT COUNT(*) c FROM ledgers').get().c > 0,
 }));
 
 route('POST', '/api/attendance', 'staff', ({ body, user }) => {
@@ -123,7 +132,8 @@ route('POST', '/api/attendance', 'staff', ({ body, user }) => {
   const ts = Date.now();
   const info = db.prepare('INSERT INTO attendance(staff_id,godown_id,type,ts,day,lat,lng,accuracy,distance_m) VALUES(?,?,?,?,?,?,?,?,?)')
     .run(user.staff.id, near.id, type, ts, istDay(ts), lat, lng, acc, near.distance);
-  sendWebhook({ event: 'attendance', id: Number(info.lastInsertRowid), type, staff: user.staff.name, mobile: user.staff.mobile, godown: near.name, time: new Date(ts + IST).toISOString().replace('Z', '+05:30'), distance_m: Math.round(near.distance) });
+  const aid = Number(info.lastInsertRowid);
+  enqueue('attendance', aid, { module: 'attendance', event_id: 'att-' + aid, type, staff: user.staff.name, mobile: user.staff.mobile, godown: near.name, time: new Date(ts + IST).toISOString().slice(0, 19) + '+05:30', lat, lng, distance_m: Math.round(near.distance) });
   return { ok: true, godown: near.name, distance_m: Math.round(near.distance), today: todayStatus(user.staff.id) };
 });
 
@@ -164,12 +174,36 @@ route('POST', '/api/receipts', 'staff', ({ body, user }) => {
   const info = db.prepare('INSERT INTO receipts(client_id,staff_id,ts,vdate,party,amount,mode,bills,narration,lat,lng) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
     .run(clientId, user.staff.id, ts, istDay(ts), party, amount, mode, JSON.stringify(bills), str(body.narration, 250), Number.isFinite(lat) ? lat : null, Number.isFinite(lng) ? lng : null);
   const rec = db.prepare('SELECT * FROM receipts WHERE id=?').get(info.lastInsertRowid);
-  sendWebhook({ event: 'receipt', id: rec.id, staff: user.staff.name, party, amount, mode });
+  enqueue('receipt', rec.id, { module: 'receipt', event_id: 'rc-' + rec.id, date: rec.vdate, party, amount, mode, bills, narration: rec.narration || '', staff: user.staff.name });
   return { ok: true, receipt: rec };
 });
 
 route('GET', '/api/receipts', 'staff', ({ user }) =>
   db.prepare('SELECT id,client_id,ts,party,amount,mode,bills,narration,status,error,voucher_no FROM receipts WHERE staff_id=? ORDER BY id DESC LIMIT 100').all(user.staff.id));
+
+function checkParty(name) {
+  let party = str(name, 120); if (!party) throw bad('Choose the customer.');
+  if (db.prepare('SELECT COUNT(*) c FROM ledgers').get().c > 0) {
+    const m = db.prepare('SELECT name FROM ledgers WHERE lower(name)=lower(?)').get(party);
+    if (!m) throw bad('This customer is not in Tally. Pick the name from the list.'); party = m.name;
+  }
+  return party;
+}
+route('POST', '/api/orders', 'staff', ({ body, user }) => {
+  const clientId = str(body.client_id, 64); if (!clientId) throw bad('client_id missing');
+  const exist = db.prepare('SELECT * FROM orders WHERE staff_id=? AND client_id=?').get(user.staff.id, clientId);
+  if (exist) return { ok: true, duplicate: true, order: exist };
+  const party = checkParty(body.party);
+  const items = (Array.isArray(body.items) ? body.items : []).map((i) => ({ name: str(i.name, 100), qty: num(i.qty), rate: i.rate === '' || i.rate == null ? null : num(i.rate) }));
+  if (!items.length || items.length > 50) throw bad('Add at least one item.');
+  for (const i of items) if (!i.name || !(i.qty > 0) || i.qty > 1e7 || (i.rate !== null && !(i.rate >= 0))) throw bad('Each item needs a name and a quantity.');
+  const ts = Date.now();
+  const info = db.prepare('INSERT INTO orders(client_id,staff_id,ts,odate,party,items,note) VALUES(?,?,?,?,?,?,?)').run(clientId, user.staff.id, ts, istDay(ts), party, JSON.stringify(items), str(body.note, 250));
+  const id = Number(info.lastInsertRowid);
+  enqueue('order', id, { module: 'order', event_id: 'od-' + id, date: istDay(ts), party, items, note: str(body.note, 250), staff: user.staff.name });
+  return { ok: true, order: db.prepare('SELECT * FROM orders WHERE id=?').get(id) };
+});
+route('GET', '/api/orders', 'staff', ({ user }) => db.prepare('SELECT id,ts,party,items,note,status,error FROM orders WHERE staff_id=? ORDER BY id DESC LIMIT 100').all(user.staff.id));
 
 // a manager standing at a godown can fix its GPS point from the phone
 route('POST', '/api/godowns/:id/here', 'manager', ({ params, body }) => {
@@ -283,18 +317,28 @@ route('DELETE', '/api/admin/receipts/:id', 'admin', ({ params }) => {
   if (!r.changes) throw bad('Only pending or failed receipts can be deleted (synced ones are already in Tally).'); return { ok: true };
 });
 
-route('GET', '/api/admin/settings', 'admin', () => ({ mode_ledgers: modeLedgers(), webhook_url: getSetting('webhook_url'), bridge_key: BRIDGE_KEY, tally_company: getSetting('tally_company') }));
+route('GET', '/api/admin/settings', 'admin', () => ({ mode_ledgers: modeLedgers(), connectors: connectors(), bridge_key: BRIDGE_KEY, tally_company: getSetting('tally_company') }));
 route('PUT', '/api/admin/settings', 'admin', ({ body }) => {
   if (body.mode_ledgers) { const m = {}; for (const k of Object.keys(DEFAULT_MODE_LEDGERS)) m[k] = str(body.mode_ledgers[k], 100) || DEFAULT_MODE_LEDGERS[k]; setSetting('mode_ledgers', JSON.stringify(m)); }
-  if (body.webhook_url !== undefined) { const u = str(body.webhook_url, 300); if (u && !/^https?:\/\//.test(u)) throw bad('Webhook must start with http:// or https://'); setSetting('webhook_url', u); }
+  if (body.connectors) {
+    const c = {}; for (const m of MODULES) { const u = str(body.connectors[m]?.url, 400); if (u && !/^https?:\/\//.test(u)) throw bad(`${m}: URL must start with http:// or https://`); c[m] = { url: u, secret: str(body.connectors[m]?.secret, 200) }; }
+    setSetting('connectors', JSON.stringify(c));
+  }
   if (body.tally_company !== undefined) setSetting('tally_company', str(body.tally_company, 120));
   return { ok: true };
 });
 
+route('GET', '/api/admin/orders', 'admin', () => db.prepare('SELECT o.*, s.name staff FROM orders o JOIN staff s ON s.id=o.staff_id ORDER BY o.id DESC LIMIT 300').all());
+route('GET', '/api/admin/outbox', 'admin', () => {
+  const by = db.prepare("SELECT module, status, COUNT(*) n FROM outbox GROUP BY module, status").all();
+  return { counts: by, recent: db.prepare("SELECT id,module,status,attempts,error,created FROM outbox WHERE status!='done' ORDER BY id DESC LIMIT 50").all() };
+});
+route('POST', '/api/admin/outbox/retry', 'admin', () => ({ ok: true, changed: db.prepare("UPDATE outbox SET status='pending', attempts=0, next_try=0 WHERE status='failed'").run().changes }));
+
 // ---------- Tally bridge (runs on the PC where Tally is open) ----------
 route('GET', '/api/bridge/pending', 'bridge', () => {
   setSetting('bridge_seen', Date.now());
-  const rows = db.prepare("SELECT r.*, s.name staff FROM receipts r JOIN staff s ON s.id=r.staff_id WHERE r.status='pending' ORDER BY r.id LIMIT 25").all();
+  const rows = connectors().receipt.url ? [] : db.prepare("SELECT r.*, s.name staff FROM receipts r JOIN staff s ON s.id=r.staff_id WHERE r.status='pending' ORDER BY r.id LIMIT 25").all();
   return { receipts: rows.map((r) => ({ ...r, bills: JSON.parse(r.bills) })), mode_ledgers: modeLedgers(), company: getSetting('tally_company') };
 });
 route('POST', '/api/bridge/ack', 'bridge', ({ body }) => {
@@ -312,10 +356,40 @@ route('POST', '/api/bridge/ledgers', 'bridge', ({ body }) => {
   return { ok: true, count: names.length };
 });
 
-// ---------- webhook (e.g. to feed another attendance tool) ----------
-function sendWebhook(payload) {
-  const url = getSetting('webhook_url'); if (!url) return;
-  fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(8000) }).catch((e) => console.warn('webhook failed:', e.message));
+// ---------- outbox: reliable forwarding of every event to the system that owns it ----------
+function enqueue(module, refId, payload) {
+  if (!connectors()[module].url) return;
+  db.prepare('INSERT INTO outbox(module,ref_id,payload,created) VALUES(?,?,?,?)').run(module, refId, JSON.stringify(payload), Date.now());
+  setImmediate(drainOutbox);
+}
+const REF_TABLE = { receipt: 'receipts', order: 'orders' };
+function markRef(module, refId, ok, error) {
+  const t = REF_TABLE[module]; if (!t) return;
+  if (ok) db.prepare(`UPDATE ${t} SET status='synced', error=NULL WHERE id=?`).run(refId);
+  else db.prepare(`UPDATE ${t} SET error=? WHERE id=?`).run(error, refId);
+}
+let current = null, again = false;
+function drainOutbox() {
+  if (current) { again = true; return current; }
+  current = (async () => { try { do { again = false; await drainOnce(); } while (again); } finally { current = null; } })();
+  return current;
+}
+async function drainOnce() {
+  {
+    const rows = db.prepare("SELECT * FROM outbox WHERE status='pending' AND next_try<=? ORDER BY id LIMIT 10").all(Date.now());
+    for (const r of rows) {
+      const c = connectors()[r.module]; let ok = false, error = '';
+      if (!c.url) { db.prepare("UPDATE outbox SET status='done', done=? WHERE id=?").run(Date.now(), r.id); continue; }
+      try {
+        const res = await fetch(c.url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-hub-key': c.secret }, body: r.payload, redirect: 'follow', signal: AbortSignal.timeout(20000) });
+        const text = await res.text(); let j = null; try { j = JSON.parse(text); } catch {}
+        ok = res.ok && !(j && (j.ok === false || j.error)); if (!ok) error = (j && (j.error || j.message)) || `HTTP ${res.status}: ${text.slice(0, 120)}`;
+      } catch (e) { error = e.message; }
+      const attempts = r.attempts + 1;
+      if (ok) { db.prepare("UPDATE outbox SET status='done', done=?, attempts=?, error=NULL WHERE id=?").run(Date.now(), attempts, r.id); markRef(r.module, r.ref_id, true); }
+      else { db.prepare('UPDATE outbox SET status=?, attempts=?, next_try=?, error=? WHERE id=?').run(attempts >= 12 ? 'failed' : 'pending', attempts, Date.now() + Math.min(60000 * 2 ** attempts, 3600000), error.slice(0, 300), r.id); markRef(r.module, r.ref_id, false, error.slice(0, 300)); }
+    }
+  }
 }
 
 // ---------- server ----------
@@ -362,6 +436,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   setInterval(() => db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now()), 3600000).unref();
+  setInterval(drainOutbox, 15000).unref();
   server.listen(PORT, () => console.log(`Rohpo Staff server running on http://localhost:${PORT}  (admin panel: /admin)`));
 }
-module.exports = { server, db, haversine };
+module.exports = { server, db, haversine, drainOutbox };
