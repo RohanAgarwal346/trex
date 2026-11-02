@@ -26,6 +26,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
       - uses: android-actions/setup-android@v3
+        with: { packages: '' }   # SDK is preinstalled on the runner; this just accepts licences
       - name: Bake in server address
         env: { SERVER_URL: '${{ inputs.server_url || vars.ROPO_SERVER_URL }}' }
         run: |
