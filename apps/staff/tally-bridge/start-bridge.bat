@@ -1,5 +1,5 @@
 @echo off
-REM Double-click to start the Ropo Tally Bridge (keep this window open while staff are working).
+REM Double-click to start the Rohpo Tally Bridge (keep this window open while staff are working).
 cd /d "%~dp0"
 :loop
 node bridge.js

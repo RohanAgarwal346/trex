@@ -2,7 +2,7 @@
   "name": "ropo-staff-server",
   "version": "1.0.0",
   "private": true,
-  "description": "Ropo Staff server - attendance (godown geofence), receipts, Tally bridge API and admin panel. Zero dependencies, Node 22+.",
+  "description": "Rohpo Staff server - attendance (godown geofence), receipts, Tally bridge API and admin panel. Zero dependencies, Node 22+.",
   "main": "server.js",
   "engines": { "node": ">=22.13" },
   "scripts": { "start": "node --disable-warning=ExperimentalWarning server.js", "test": "node --disable-warning=ExperimentalWarning test.js" }

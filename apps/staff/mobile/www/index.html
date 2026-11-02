@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#5b21b6">
-<title>Ropo Staff</title>
+<title>Rohpo Staff</title>
 <style>
 :root{--p1:#7c3aed;--p2:#ec4899;--p3:#f59e0b;--g:#10b981;--r:#ef4444;--b:#0ea5e9;--ink:#1e1b4b;--mut:#6b7280;--bg:#f5f3ff;--card:#fff;--top:env(safe-area-inset-top);--bot:env(safe-area-inset-bottom)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -57,7 +57,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const inr = (n) => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const IST = 19800000, fmtTime = (ts) => new Date(ts + IST).toISOString().slice(11, 16), fmtDate = (ts) => { const d = new Date(ts + IST); return d.toISOString().slice(8, 10) + '/' + d.toISOString().slice(5, 7); };
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'c' + Date.now() + Math.random().toString(16).slice(2));
-let SERVER = (LS.get('ropo_server') || (window.ROPO_CONFIG && window.ROPO_CONFIG.SERVER_URL) || '').replace(/\/+$/, '');
+let SERVER = (LS.get('ropo_server') || (window.ROHPO_CONFIG && window.ROHPO_CONFIG.SERVER_URL) || '').replace(/\/+$/, '');
 let token = LS.get('ropo_token'), me = null, tab = 'home', histTab = 'att', pos = null, posErr = '';
 let toastT;
 function toast(msg) { document.querySelector('.toast')?.remove(); const d = document.createElement('div'); d.className = 'toast'; d.textContent = msg; document.body.appendChild(d); clearTimeout(toastT); toastT = setTimeout(() => d.remove(), 3500); }
@@ -80,7 +80,7 @@ async function deviceId() {
 function logout(silent) { token = null; me = null; LS.del('ropo_token'); render(); if (!silent) toast('Logged out'); }
 
 // ---------- location ----------
-async function ensurePerm(G) { const p = await G.checkPermissions(); if (p.location === 'granted') return; const r = await G.requestPermissions({ permissions: ['location'] }); if (r.location !== 'granted') throw new Error('Location permission is OFF. Open phone Settings > Apps > Ropo Staff > Permissions > Location and allow it.'); }
+async function ensurePerm(G) { const p = await G.checkPermissions(); if (p.location === 'granted') return; const r = await G.requestPermissions({ permissions: ['location'] }); if (r.location !== 'granted') throw new Error('Location permission is OFF. Open phone Settings > Apps > Rohpo Staff > Permissions > Location and allow it.'); }
 async function getOne(G, timeout) {
   if (G) { const p = await G.getCurrentPosition({ enableHighAccuracy: true, timeout, maximumAge: 0 }); return { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }; }
   return new Promise((res, rej) => navigator.geolocation ? navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }), (e) => rej(new Error(e.message || 'Location unavailable')), { enableHighAccuracy: true, timeout, maximumAge: 0 }) : rej(new Error('Location not supported')));
@@ -114,13 +114,13 @@ addEventListener('online', flushQueue); setInterval(flushQueue, 30000);
 
 // ---------- views ----------
 function viewSetup() {
-  $app.innerHTML = `<div class="login"><div class="box"><img src="logo.png" alt="Ropo"><h2>Ropo Staff</h2><p>सर्वर का पता डालें / Enter server address</p>
+  $app.innerHTML = `<div class="login"><div class="box"><img src="logo.png" alt="Rohpo"><h2>Rohpo Staff</h2><p>सर्वर का पता डालें / Enter server address</p>
   <label>Server address</label><input id="srv" inputmode="url" autocapitalize="off" placeholder="https://staff.example.com" value="${esc(SERVER)}">
   <div id="msg"></div><button class="pri" style="margin-top:18px" id="save">Save / सेव करें</button></div></div>`;
   document.getElementById('save').onclick = () => { let v = document.getElementById('srv').value.trim().replace(/\/+$/, ''); if (!/^https?:\/\//.test(v)) v = (/^[\d.]+(:\d+)?$/.test(v) ? 'http://' : 'https://') + v; if (v.length < 10) return; SERVER = v; LS.set('ropo_server', v); render(); };
 }
 function viewLogin() {
-  $app.innerHTML = `<div class="login"><div class="box"><img src="logo.png" alt="Ropo"><h2>Ropo Staff</h2><p>लॉगिन करें / Login</p>
+  $app.innerHTML = `<div class="login"><div class="box"><img src="logo.png" alt="Rohpo"><h2>Rohpo Staff</h2><p>लॉगिन करें / Login</p>
   <label>मोबाइल नंबर / Mobile</label><input id="mob" inputmode="numeric" maxlength="10" placeholder="10 digit number" value="${esc(LS.get('ropo_mobile') || '')}">
   <label>पिन / PIN</label><input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••">
   <div id="msg"></div><button class="pri" style="margin-top:18px" id="go">लॉगिन / Login</button></div>
@@ -230,7 +230,7 @@ async function viewMe() {
 function render() {
   if (!SERVER) return viewSetup();
   if (!token) return viewLogin();
-  if (!me) { $app.innerHTML = '<div class="login"><div class="box"><img src="logo.png" alt=""><h2>Ropo Staff</h2><p>Loading…</p></div></div>'; loadMe().then(() => { render(); flushQueue(); refreshPos(); }).catch((e) => { if (token) $app.innerHTML = `<div class="login"><div class="box"><img src="logo.png" alt=""><div class="err">${esc(e.message)}</div><button class="pri" onclick="location.reload()">Retry</button></div></div>`; }); return; }
+  if (!me) { $app.innerHTML = '<div class="login"><div class="box"><img src="logo.png" alt=""><h2>Rohpo Staff</h2><p>Loading…</p></div></div>'; loadMe().then(() => { render(); flushQueue(); refreshPos(); }).catch((e) => { if (token) $app.innerHTML = `<div class="login"><div class="box"><img src="logo.png" alt=""><div class="err">${esc(e.message)}</div><button class="pri" onclick="location.reload()">Retry</button></div></div>`; }); return; }
   ({ home: viewHome, receipt: viewReceipt, hist: viewHist, me: viewMe })[tab]();
 }
 render();

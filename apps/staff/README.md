@@ -1,11 +1,11 @@
-# Ropo Staff app
+# Rohpo Staff app
 
 Staff Android app + owner admin panel + Tally connector.
 
 | Part | Folder | What it does |
 |---|---|---|
 | Server + admin panel | `server/` | Staff login (mobile + PIN), 100 m godown geofence attendance, receipts queue, CSV export, webhook |
-| Android app | `mobile/` | What staff install (APK). Built by GitHub Actions: **Actions → Build Ropo Staff APK** |
+| Android app | `mobile/` | What staff install (APK). Built by GitHub Actions: **Actions → Build Rohpo Staff APK** |
 | Tally bridge | `tally-bridge/` | Runs on the Tally PC; pushes receipts into Tally, loads customer list from Tally |
 
 ## 1. Run the server (needs a public HTTPS address so staff phones can reach it)
@@ -20,7 +20,7 @@ Open `/admin`, then:
 3. **Settings & Tally** - set your Cash / Bank ledger names; copy the bridge key.
 
 ## 2. Build the APK
-GitHub → Actions → **Build Ropo Staff APK** → Run workflow, type your server address. Download `Ropo-Staff.apk` from the Release, send it to staff (WhatsApp). On the phone: allow "install unknown apps", open, log in, allow Location.
+GitHub → Actions → **Build Rohpo Staff APK** → Run workflow, type your server address. Download `Rohpo-Staff.apk` from the Release, send it to staff (WhatsApp). On the phone: allow "install unknown apps", open, log in, allow Location.
 
 **One-time signing key (so updates install over old versions):** create a keystore on your PC
 `keytool -genkeypair -keystore ropo.jks -alias ropo -keyalg RSA -keysize 2048 -validity 10000`
@@ -30,7 +30,7 @@ then add GitHub repo secrets `ANDROID_KEYSTORE_B64` (`base64 -w0 ropo.jks`), `AN
 On the Tally PC: F1 → Settings → Connectivity → Tally acts as **Both**, port 9000, company open. Copy `tally-bridge/config.example.json` to `config.json`, fill serverUrl + bridgeKey, run `start-bridge.bat`.
 
 ## Logo
-The current logo is a placeholder. Replace `mobile/assets/logo.png` (1024×1024 PNG), `mobile/www/logo.png` and `server/public/logo.png` with the real Ropo logo and rebuild.
+The ROHPO logo is in `mobile/assets/logo.png`, `mobile/www/logo.png` and `server/public/logo.png` (replace all three to change it).
 
 ## Security notes
 * The server enforces the 100 m rule (the phone only reports GPS). One account = one phone (admin can reset). 5 wrong PINs = 10-minute lock.

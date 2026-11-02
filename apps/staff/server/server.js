@@ -1,5 +1,5 @@
 'use strict';
-// Ropo Staff server: staff login (mobile + PIN), godown geofenced attendance, receipts queue for Tally,
+// Rohpo Staff server: staff login (mobile + PIN), godown geofenced attendance, receipts queue for Tally,
 // admin panel, and a bridge API that a small script on the Tally PC polls. No npm dependencies.
 const http = require('node:http');
 const fs = require('node:fs');
@@ -362,6 +362,6 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   setInterval(() => db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now()), 3600000).unref();
-  server.listen(PORT, () => console.log(`Ropo Staff server running on http://localhost:${PORT}  (admin panel: /admin)`));
+  server.listen(PORT, () => console.log(`Rohpo Staff server running on http://localhost:${PORT}  (admin panel: /admin)`));
 }
 module.exports = { server, db, haversine };

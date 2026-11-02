@@ -1,6 +1,6 @@
 'use strict';
-// Ropo Tally Bridge - run this on the PC where Tally is open (Tally: F1 > Settings > Connectivity > "Tally acts as: Server/Both", port 9000).
-// It pulls receipts entered by staff from the Ropo server and posts them into Tally as Receipt vouchers,
+// Rohpo Tally Bridge - run this on the PC where Tally is open (Tally: F1 > Settings > Connectivity > "Tally acts as: Server/Both", port 9000).
+// It pulls receipts entered by staff from the Rohpo server and posts them into Tally as Receipt vouchers,
 // and sends the Tally customer (Sundry Debtors) list back to the app. Zero dependencies, Node 18+.
 const http = require('node:http');
 const fs = require('node:fs');
@@ -41,7 +41,7 @@ function receiptXml(r, ledgers, company) {
   const billed = bills.reduce((s, b) => s + b.amount, 0), rest = r.amount - billed;
   const alloc = [...bills.map((b) => `<BILLALLOCATIONS.LIST><NAME>${esc(b.ref)}</NAME><BILLTYPE>Agst Ref</BILLTYPE><AMOUNT>${amt(b.amount)}</AMOUNT></BILLALLOCATIONS.LIST>`),
     ...(rest > 0.004 ? [`<BILLALLOCATIONS.LIST><NAME>Receipt-App-${r.id}</NAME><BILLTYPE>On Account</BILLTYPE><AMOUNT>${amt(rest)}</AMOUNT></BILLALLOCATIONS.LIST>`] : [])].join('');
-  const narration = `${r.narration ? r.narration + ' | ' : ''}Collected by ${r.staff} via Ropo app [#${r.id}]${r.mode !== 'cash' ? ' (' + r.mode.toUpperCase() + ')' : ''}`;
+  const narration = `${r.narration ? r.narration + ' | ' : ''}Collected by ${r.staff} via Rohpo app [#${r.id}]${r.mode !== 'cash' ? ' (' + r.mode.toUpperCase() + ')' : ''}`;
   return `<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME>` +
     `<STATICVARIABLES>${company ? `<SVCURRENTCOMPANY>${esc(company)}</SVCURRENTCOMPANY>` : ''}</STATICVARIABLES></REQUESTDESC><REQUESTDATA>` +
     `<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER REMOTEID="ropo-receipt-${r.id}" VCHTYPE="${esc(cfg.voucherType)}" ACTION="Create" OBJVIEW="Accounting Voucher View">` +
@@ -72,8 +72,8 @@ async function pushReceipts() {
 async function pushLedgers() {
   const names = new Set();
   for (const g of cfg.partyGroups) {
-    const xml = `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>RopoParties</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>` +
-      `${cfg.company ? `<SVCURRENTCOMPANY>${esc(cfg.company)}</SVCURRENTCOMPANY>` : ''}</STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="RopoParties" ISMODIFY="No"><TYPE>Ledger</TYPE><CHILDOF>${esc(g)}</CHILDOF><BELONGSTO>Yes</BELONGSTO><FETCH>Name</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`;
+    const xml = `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>RohpoParties</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>` +
+      `${cfg.company ? `<SVCURRENTCOMPANY>${esc(cfg.company)}</SVCURRENTCOMPANY>` : ''}</STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="RohpoParties" ISMODIFY="No"><TYPE>Ledger</TYPE><CHILDOF>${esc(g)}</CHILDOF><BELONGSTO>Yes</BELONGSTO><FETCH>Name</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`;
     const resp = await tally(xml);
     for (const m of resp.matchAll(/<LEDGER\b[^>]*?\sNAME="([^"]+)"/g)) names.add(unesc(m[1]).trim());
   }
@@ -90,5 +90,5 @@ async function tick() {
   } catch (e) { log('Error:', e.message); } finally { busy = false; }
 }
 if (process.argv.includes('--test-xml')) { console.log(receiptXml({ id: 1, vdate: '2026-11-02', party: 'Phoolchand & Sons', amount: 5000, mode: 'cash', bills: [{ ref: 'INV-1', amount: 2000 }], narration: '', staff: 'Ramesh' }, { cash: 'Cash' }, '')); process.exit(0); }
-log(`Ropo Tally Bridge started. Server: ${SERVER}  Tally: ${cfg.tallyHost}:${cfg.tallyPort}`);
+log(`Rohpo Tally Bridge started. Server: ${SERVER}  Tally: ${cfg.tallyHost}:${cfg.tallyPort}`);
 tick(); setInterval(tick, cfg.pollSeconds * 1000);
