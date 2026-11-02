@@ -62,8 +62,31 @@ let token = LS.get('ropo_token'), me = null, tab = 'home', histTab = 'att', pos 
 let toastT;
 function toast(msg) { document.querySelector('.toast')?.remove(); const d = document.createElement('div'); d.className = 'toast'; d.textContent = msg; document.body.appendChild(d); clearTimeout(toastT); toastT = setTimeout(() => d.remove(), 3500); }
 
+// ---------- demo mode: works with no server so the owner can see every screen ----------
+const demoDb = { punches: [], receipts: [], orders: [], n: 0, godown: { id: 1, name: 'Burrabazar Godown (DEMO)', lat: 22.5726, lng: 88.3639, radius_m: 100 },
+  parties: ['Phoolchand & Sons', 'Ram Traders', 'Gupta Stores', 'Sharma Enterprises', 'Mahavir Kirana'] };
+const demoToday = () => { const p = demoDb.punches; return { day: new Date(Date.now() + IST).toISOString().slice(0, 10), punches: p, state: p.length && p[p.length - 1].type === 'in' ? 'in' : 'out' }; };
+function demoApi(path, method, body) {
+  const [pth, qs] = path.split('?'); const q = new URLSearchParams(qs || ''); const D = demoDb;
+  const staff = { id: 1, name: 'Ramesh Kumar (Demo)', mobile: '9876543210', role: 'manager', can_receipt: true };
+  if (pth === '/api/login') return { token: 'demo', staff };
+  if (pth === '/api/me') return { staff, today: demoToday(), godowns: [D.godown], modes: ['cash', 'upi', 'bank', 'cheque'], modules: ['attendance', 'receipt', 'order'], parties_synced: true };
+  if (pth === '/api/attendance' && method === 'POST') { D.punches.push({ type: body.type, ts: Date.now(), godown: D.godown.name }); return { ok: true, godown: D.godown.name, distance_m: 42, today: demoToday() }; }
+  if (pth === '/api/attendance') return D.punches.slice().reverse().map((p) => ({ ...p, distance_m: 42 }));
+  if (pth === '/api/parties') return D.parties.filter((n) => n.toLowerCase().includes((q.get('q') || '').toLowerCase()));
+  if (pth === '/api/receipts' && method === 'POST') { D.receipts.unshift({ id: ++D.n, ts: Date.now(), party: body.party, amount: body.amount, mode: body.mode, status: 'synced', voucher_no: 'D' + D.n }); return { ok: true }; }
+  if (pth === '/api/receipts') return D.receipts;
+  if (pth === '/api/orders' && method === 'POST') { D.orders.unshift({ id: ++D.n, ts: Date.now(), party: body.party, items: JSON.stringify(body.items), note: body.note, status: 'synced' }); return { ok: true }; }
+  if (pth === '/api/orders') return D.orders;
+  if (pth === '/api/godowns') return [D.godown];
+  if (pth.endsWith('/here')) return { ok: true };
+  return {};
+}
+const isDemo = () => SERVER === 'demo';
+
 class NetErr extends Error {}
 async function api(path, method = 'GET', body) {
+  if (isDemo()) { await new Promise((r) => setTimeout(r, 250)); return demoApi(path, method, body); }
   let r;
   try { r = await fetch(SERVER + path, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}) }, body: body ? JSON.stringify(body) : undefined }); }
   catch { throw new NetErr('No internet / server not reachable'); }
@@ -86,6 +109,7 @@ async function getOne(G, timeout) {
   return new Promise((res, rej) => navigator.geolocation ? navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }), (e) => rej(new Error(e.message || 'Location unavailable')), { enableHighAccuracy: true, timeout, maximumAge: 0 }) : rej(new Error('Location not supported')));
 }
 async function getPos() {
+  if (isDemo()) return { lat: 22.5729, lng: 88.3639, accuracy: 12 };
   const G = window.Capacitor?.Plugins?.Geolocation;
   if (G) await ensurePerm(G);
   let best = null;
@@ -116,7 +140,9 @@ addEventListener('online', flushQueue); setInterval(flushQueue, 30000);
 function viewSetup() {
   $app.innerHTML = `<div class="login"><div class="box"><img src="logo.png" alt="Rohpo"><h2>Rohpo Staff</h2><p>सर्वर का पता डालें / Enter server address</p>
   <label>Server address</label><input id="srv" inputmode="url" autocapitalize="off" placeholder="https://staff.example.com" value="${esc(SERVER)}">
-  <div id="msg"></div><button class="pri" style="margin-top:18px" id="save">Save / सेव करें</button></div></div>`;
+  <div id="msg"></div><button class="pri" style="margin-top:18px" id="save">Save / सेव करें</button>
+  <button class="ghost" style="width:100%;margin-top:12px" id="demo">👀 डेमो देखें / Try demo (no server)</button></div></div>`;
+  document.getElementById('demo').onclick = () => { SERVER = 'demo'; LS.set('ropo_server', 'demo'); token = 'demo'; LS.set('ropo_token', 'demo'); me = null; tab = 'home'; render(); };
   document.getElementById('save').onclick = () => { let v = document.getElementById('srv').value.trim().replace(/\/+$/, ''); if (!/^https?:\/\//.test(v)) v = (/^[\d.]+(:\d+)?$/.test(v) ? 'http://' : 'https://') + v; if (v.length < 10) return; SERVER = v; LS.set('ropo_server', v); render(); };
 }
 function viewLogin() {
@@ -136,6 +162,7 @@ function viewLogin() {
 async function loadMe() { me = await api('/api/me'); }
 
 function shell(title, sub, body) {
+  if (isDemo()) sub = '🧪 DEMO मोड · ' + sub;
   const nav = [['home', '📍', 'हाज़िरी'], ['receipt', '💰', 'रसीद'], ['order', '🛒', 'ऑर्डर'], ['hist', '📋', 'इतिहास'], ['me', '👤', 'प्रोफाइल']];
   $app.innerHTML = `<div class="hdr"><img src="logo.png" alt=""><div><h1>${esc(title)}</h1><small>${esc(sub)}</small></div></div><main id="main">${body}</main>
   <nav>${nav.map(([k, i, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}"><span>${i}</span>${l}</button>`).join('')}</nav>`;
