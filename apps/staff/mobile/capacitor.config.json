@@ -1,0 +1,9 @@
+{
+  "appId": "com.ropo.staff",
+  "appName": "Ropo Staff",
+  "webDir": "www",
+  "backgroundColor": "#5b21b6",
+  "server": { "androidScheme": "https", "cleartext": true },
+  "android": { "allowMixedContent": true },
+  "plugins": { "CapacitorHttp": { "enabled": true } }
+}

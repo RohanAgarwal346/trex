@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#5b21b6">
+<title>Ropo Staff</title>
+<style>
+:root{--p1:#7c3aed;--p2:#ec4899;--p3:#f59e0b;--g:#10b981;--r:#ef4444;--b:#0ea5e9;--ink:#1e1b4b;--mut:#6b7280;--bg:#f5f3ff;--card:#fff;--top:env(safe-area-inset-top);--bot:env(safe-area-inset-bottom)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Devanagari",sans-serif;font-size:17px}
+#app{height:100%;display:flex;flex-direction:column}
+.hdr{background:linear-gradient(135deg,#5b21b6,#c026d3 55%,#f97316);color:#fff;padding:calc(var(--top) + 14px) 18px 22px;border-radius:0 0 28px 28px;box-shadow:0 8px 24px #7c3aed44;display:flex;align-items:center;gap:14px}
+.hdr img{width:52px;height:52px;border-radius:14px;box-shadow:0 2px 10px #0004}
+.hdr h1{margin:0;font-size:21px;line-height:1.2}.hdr small{opacity:.9;font-size:14px}
+main{flex:1;overflow-y:auto;padding:16px 16px 24px;-webkit-overflow-scrolling:touch}
+nav{display:flex;background:#fff;border-top:1px solid #e5e7eb;padding-bottom:var(--bot);box-shadow:0 -4px 16px #0001}
+nav button{flex:1;border:0;background:none;padding:9px 0 8px;font-size:12.5px;color:var(--mut);font-weight:600}
+nav button span{display:block;font-size:24px;line-height:1.2}
+nav button.on{color:var(--p1)}nav button.on span{transform:scale(1.15)}
+.card{background:var(--card);border-radius:22px;padding:18px;margin-bottom:14px;box-shadow:0 4px 18px #4c1d9511}
+.big{border-radius:26px;padding:22px;color:#fff;margin-bottom:14px;box-shadow:0 10px 26px #0003}
+.in{background:linear-gradient(135deg,#059669,#10b981 60%,#34d399)}.out{background:linear-gradient(135deg,#dc2626,#f97316)}.idle{background:linear-gradient(135deg,#6b7280,#9ca3af)}
+.big .st{font-size:15px;opacity:.95;font-weight:600}.big .dist{font-size:30px;font-weight:800;margin:4px 0 2px}.big .sub{font-size:14px;opacity:.95}
+button.cta{width:100%;border:0;border-radius:18px;padding:17px;font-size:21px;font-weight:800;color:var(--ink);background:#fff;margin-top:14px;box-shadow:0 4px 14px #0003}
+button.cta:disabled{opacity:.6}
+button.pri{width:100%;border:0;border-radius:16px;padding:16px;font-size:19px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--p1),var(--p2));box-shadow:0 6px 18px #7c3aed55}
+button.pri:disabled{opacity:.6}button.ghost{border:2px solid var(--p1);color:var(--p1);background:#fff;border-radius:14px;padding:10px 16px;font-size:16px;font-weight:700}
+label{display:block;font-weight:700;font-size:15px;margin:14px 0 6px;color:#4c1d95}
+input,select,textarea{width:100%;padding:14px;border:2px solid #ddd6fe;border-radius:14px;font-size:18px;background:#fff;color:var(--ink);font-family:inherit}
+input:focus,textarea:focus{outline:none;border-color:var(--p1)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{flex:1;min-width:70px;text-align:center;padding:12px 6px;border-radius:14px;border:2px solid #ddd6fe;background:#fff;font-weight:700;font-size:16px}
+.chip.on{color:#fff;border-color:transparent}.chip[data-m=cash].on{background:#10b981}.chip[data-m=upi].on{background:#8b5cf6}.chip[data-m=bank].on{background:#0ea5e9}.chip[data-m=cheque].on{background:#f59e0b}
+.sug{background:#fff;border:2px solid #ddd6fe;border-radius:14px;margin-top:4px;max-height:220px;overflow:auto}.sug div{padding:13px 14px;border-bottom:1px solid #f3f4f6}.sug div:active{background:#f5f3ff}
+.billrow{display:flex;gap:8px;margin-bottom:8px}.billrow input:first-child{flex:1.3}.billrow input:nth-child(2){flex:1}.billrow button{border:0;background:#fee2e2;color:#b91c1c;border-radius:12px;width:46px;font-size:20px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f3f4f6}.row:last-child{border:0}
+.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:700}
+.b-pending{background:#fef3c7;color:#92400e}.b-synced{background:#d1fae5;color:#065f46}.b-failed{background:#fee2e2;color:#991b1b}.b-in{background:#d1fae5;color:#065f46}.b-out{background:#fee2e2;color:#991b1b}
+.tabs{display:flex;background:#ede9fe;border-radius:16px;padding:4px;margin-bottom:14px}.tabs button{flex:1;border:0;background:none;padding:11px;border-radius:12px;font-weight:700;font-size:16px;color:#5b21b6}.tabs button.on{background:#fff;box-shadow:0 2px 8px #0002}
+.amt{font-size:20px;font-weight:800}.mut{color:var(--mut);font-size:14px}.err{background:#fee2e2;color:#991b1b;padding:12px 14px;border-radius:14px;margin:12px 0;font-weight:600}.ok{background:#d1fae5;color:#065f46;padding:12px 14px;border-radius:14px;margin:12px 0;font-weight:600}
+.login{min-height:100%;display:flex;flex-direction:column;justify-content:center;padding:calc(var(--top) + 24px) 24px 24px;background:linear-gradient(160deg,#4c1d95,#c026d3 60%,#fb923c)}
+.login .box{background:#fff;border-radius:28px;padding:24px;box-shadow:0 18px 50px #0005}.login img{width:110px;height:110px;border-radius:28px;display:block;margin:-70px auto 10px;box-shadow:0 8px 24px #0005}
+.login h2{text-align:center;margin:6px 0 2px;font-size:26px}.login p{text-align:center;color:var(--mut);margin:0 0 6px}
+.link{background:none;border:0;color:#fff;text-decoration:underline;margin-top:18px;font-size:15px}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(90px + var(--bot));background:#1e1b4b;color:#fff;padding:14px 16px;border-radius:16px;font-weight:600;z-index:9;box-shadow:0 8px 24px #0006}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="config.js"></script>
+<script>
+(() => {
+'use strict';
+const $app = document.getElementById('app');
+const LS = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }, del: (k) => { try { localStorage.removeItem(k); } catch {} } };
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const inr = (n) => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+const IST = 19800000, fmtTime = (ts) => new Date(ts + IST).toISOString().slice(11, 16), fmtDate = (ts) => { const d = new Date(ts + IST); return d.toISOString().slice(8, 10) + '/' + d.toISOString().slice(5, 7); };
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'c' + Date.now() + Math.random().toString(16).slice(2));
+let SERVER = (LS.get('ropo_server') || (window.ROPO_CONFIG && window.ROPO_CONFIG.SERVER_URL) || '').replace(/\/+$/, '');
+let token = LS.get('ropo_token'), me = null, tab = 'home', histTab = 'att', pos = null, posErr = '';
+let toastT;
+function toast(msg) { document.querySelector('.toast')?.remove(); const d = document.createElement('div'); d.className = 'toast'; d.textContent = msg; document.body.appendChild(d); clearTimeout(toastT); toastT = setTimeout(() => d.remove(), 3500); }
+
+class NetErr extends Error {}
+async function api(path, method = 'GET', body) {
+  let r;
+  try { r = await fetch(SERVER + path, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}) }, body: body ? JSON.stringify(body) : undefined }); }
+  catch { throw new NetErr('No internet / server not reachable'); }
+  let j = {}; try { j = await r.json(); } catch {}
+  if (r.status === 401 && token && path !== '/api/login') { logout(true); throw new Error(j.error || 'Please log in again'); }
+  if (!r.ok) { const e = new Error(j.error || 'Error ' + r.status); e.data = j; e.status = r.status; throw e; }
+  return j;
+}
+async function deviceId() {
+  let id = LS.get('ropo_device'); if (id) return id;
+  try { const D = window.Capacitor?.Plugins?.Device; if (D) id = (await D.getId()).identifier; } catch {}
+  id = id || uuid(); LS.set('ropo_device', id); return id;
+}
+function logout(silent) { token = null; me = null; LS.del('ropo_token'); render(); if (!silent) toast('Logged out'); }
+
+// ---------- location ----------
+async function ensurePerm(G) { const p = await G.checkPermissions(); if (p.location === 'granted') return; const r = await G.requestPermissions({ permissions: ['location'] }); if (r.location !== 'granted') throw new Error('Location permission is OFF. Open phone Settings > Apps > Ropo Staff > Permissions > Location and allow it.'); }
+async function getOne(G, timeout) {
+  if (G) { const p = await G.getCurrentPosition({ enableHighAccuracy: true, timeout, maximumAge: 0 }); return { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }; }
+  return new Promise((res, rej) => navigator.geolocation ? navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }), (e) => rej(new Error(e.message || 'Location unavailable')), { enableHighAccuracy: true, timeout, maximumAge: 0 }) : rej(new Error('Location not supported')));
+}
+async function getPos() {
+  const G = window.Capacitor?.Plugins?.Geolocation;
+  if (G) await ensurePerm(G);
+  let best = null;
+  for (let i = 0; i < 3; i++) {
+    try { const p = await getOne(G, 20000); if (!best || p.accuracy < best.accuracy) best = p; if (best.accuracy <= 40) break; } catch (e) { if (!best && i === 2) throw new Error('Could not get GPS. Turn ON phone Location (GPS) and try again.'); }
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  if (!best) throw new Error('Could not get GPS. Turn ON phone Location (GPS) and try again.');
+  return best;
+}
+const hav = (a, b, c, d) => { const R = 6371000, r = (x) => x * Math.PI / 180, q = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(q)); };
+function nearest() { if (!pos || !me) return null; let b = null; for (const g of me.godowns) { const d = hav(pos.lat, pos.lng, g.lat, g.lng); if (!b || d < b.d) b = { g, d }; } return b; }
+
+// ---------- offline receipt queue ----------
+const getQ = () => { try { return JSON.parse(LS.get('ropo_queue') || '[]'); } catch { return []; } };
+const setQ = (q) => LS.set('ropo_queue', JSON.stringify(q));
+let flushing = false;
+async function flushQueue() {
+  if (flushing || !token) return; flushing = true;
+  try { let q = getQ(); const keep = [];
+    for (const r of q) { try { await api('/api/receipts', 'POST', r); } catch (e) { if (e instanceof NetErr) { keep.push(r); } else { toast('Receipt for ' + r.party + ' rejected: ' + e.message); } } }
+    setQ(keep); if (keep.length < q.length) { toast((q.length - keep.length) + ' saved receipt(s) sent ✔'); if (tab === 'receipt' || tab === 'hist') render(); }
+  } finally { flushing = false; }
+}
+addEventListener('online', flushQueue); setInterval(flushQueue, 30000);
+
+// ---------- views ----------
+function viewSetup() {
+  $app.innerHTML = `<div class="login"><div class="box"><img src="logo.png" alt="Ropo"><h2>Ropo Staff</h2><p>सर्वर का पता डालें / Enter server address</p>
+  <label>Server address</label><input id="srv" inputmode="url" autocapitalize="off" placeholder="https://staff.example.com" value="${esc(SERVER)}">
+  <div id="msg"></div><button class="pri" style="margin-top:18px" id="save">Save / सेव करें</button></div></div>`;
+  document.getElementById('save').onclick = () => { let v = document.getElementById('srv').value.trim().replace(/\/+$/, ''); if (!/^https?:\/\//.test(v)) v = (/^[\d.]+(:\d+)?$/.test(v) ? 'http://' : 'https://') + v; if (v.length < 10) return; SERVER = v; LS.set('ropo_server', v); render(); };
+}
+function viewLogin() {
+  $app.innerHTML = `<div class="login"><div class="box"><img src="logo.png" alt="Ropo"><h2>Ropo Staff</h2><p>लॉगिन करें / Login</p>
+  <label>मोबाइल नंबर / Mobile</label><input id="mob" inputmode="numeric" maxlength="10" placeholder="10 digit number" value="${esc(LS.get('ropo_mobile') || '')}">
+  <label>पिन / PIN</label><input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••">
+  <div id="msg"></div><button class="pri" style="margin-top:18px" id="go">लॉगिन / Login</button></div>
+  <button class="link" id="chg">Change server · ${esc(SERVER.replace(/^https?:\/\//, ''))}</button></div>`;
+  document.getElementById('chg').onclick = viewSetup;
+  const go = document.getElementById('go');
+  go.onclick = async () => {
+    const msg = document.getElementById('msg'); msg.innerHTML = ''; go.disabled = true; go.textContent = '...';
+    try { const mobile = document.getElementById('mob').value.trim(); const r = await api('/api/login', 'POST', { mobile, pin: document.getElementById('pin').value, deviceId: await deviceId() }); token = r.token; LS.set('ropo_token', token); LS.set('ropo_mobile', mobile); tab = 'home'; await loadMe(); render(); }
+    catch (e) { msg.innerHTML = `<div class="err">${esc(e.message)}</div>`; go.disabled = false; go.textContent = 'लॉगिन / Login'; }
+  };
+}
+async function loadMe() { me = await api('/api/me'); }
+
+function shell(title, sub, body) {
+  const nav = [['home', '📍', 'हाज़िरी'], ['receipt', '💰', 'रसीद'], ['hist', '📋', 'इतिहास'], ['me', '👤', 'प्रोफाइल']];
+  $app.innerHTML = `<div class="hdr"><img src="logo.png" alt=""><div><h1>${esc(title)}</h1><small>${esc(sub)}</small></div></div><main id="main">${body}</main>
+  <nav>${nav.map(([k, i, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}"><span>${i}</span>${l}</button>`).join('')}</nav>`;
+  $app.querySelectorAll('nav button').forEach((b) => (b.onclick = () => { tab = b.dataset.t; render(); }));
+}
+function greeting() { const h = new Date(Date.now() + IST).getUTCHours(); return h < 12 ? 'सुप्रभात' : h < 17 ? 'नमस्ते' : 'शुभ संध्या'; }
+
+function viewHome() {
+  const t = me.today, n = nearest(), inside = n && n.d <= n.g.radius_m, isIn = t.state === 'in';
+  const cls = isIn ? 'out' : (inside ? 'in' : 'idle');
+  const where = !me.godowns.length ? 'No godown set yet — ask the owner' : posErr ? esc(posErr) : !n ? 'Checking your location…' : inside ? `✔ ${esc(n.g.name)} के पास हैं` : `${esc(n.g.name)} से दूर हैं (limit ${n.g.radius_m} m)`;
+  const punches = t.punches.map((p) => `<div class="row"><div><span class="badge b-${p.type}">${p.type === 'in' ? 'IN आए' : 'OUT गए'}</span> <span class="mut">${esc(p.godown)}</span></div><b>${fmtTime(p.ts)}</b></div>`).join('') || '<div class="mut">आज अभी तक कोई हाज़िरी नहीं / No punches yet today</div>';
+  shell(`${greeting()}, ${me.staff.name.split(' ')[0]}!`, new Date(Date.now() + IST).toISOString().slice(0, 10), `
+  <div class="big ${cls}"><div class="st">${isIn ? '🟢 आप अभी ड्यूटी पर हैं · Punched IN' : '⚪ अभी हाज़िरी नहीं · Not punched in'}</div>
+    <div class="dist">${n ? (n.d < 1000 ? Math.round(n.d) + ' m' : (n.d / 1000).toFixed(1) + ' km') : '— m'}</div><div class="sub">${where}${pos ? ` · GPS ±${Math.round(pos.accuracy)} m` : ''}</div>
+    <button class="cta" id="punch">${isIn ? '🔴 PUNCH OUT · छुट्टी' : '🟢 PUNCH IN · हाज़िरी लगाएँ'}</button></div>
+  <div style="text-align:center;margin-bottom:14px"><button class="ghost" id="refresh">🔄 Refresh location</button></div>
+  <div class="card"><b>आज की हाज़िरी / Today</b><div style="margin-top:6px">${punches}</div></div>`);
+  document.getElementById('refresh').onclick = refreshPos;
+  const btn = document.getElementById('punch');
+  btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = 'Getting GPS…';
+    try { pos = await getPos(); posErr = ''; const r = await api('/api/attendance', 'POST', { type: isIn ? 'out' : 'in', ...pos }); me.today = r.today; toast(`${isIn ? 'Punch OUT' : 'Punch IN'} ✔ ${r.godown} (${r.distance_m} m)`); }
+    catch (e) { toast(e.message); }
+    render();
+  };
+}
+async function refreshPos() { posErr = ''; const b = document.getElementById('refresh'); if (b) b.textContent = 'Locating…'; try { pos = await getPos(); } catch (e) { posErr = e.message; } if (tab === 'home') render(); }
+
+// ---- receipt form ----
+let form = null; const newForm = () => ({ client_id: uuid(), party: '', amount: '', mode: 'cash', bills: [], narration: '' });
+function viewReceipt() {
+  form = form || newForm(); const q = getQ().length;
+  shell('रसीद / Receipt', 'ग्राहक से पेमेंट लिया → Tally में अपने आप', `
+  ${q ? `<div class="err">⏳ ${q} receipt(s) saved on phone — will send when internet is back</div>` : ''}
+  <div class="card"><label style="margin-top:0">ग्राहक / Customer</label><input id="party" autocomplete="off" placeholder="${me.parties_synced ? 'Type name to search…' : 'Customer name'}" value="${esc(form.party)}"><div id="sug"></div>
+  <label>रकम / Amount (₹)</label><input id="amount" inputmode="decimal" placeholder="0" value="${esc(form.amount)}">
+  <label>कैसे मिला / Mode</label><div class="chips">${[['cash', '💵 Cash'], ['upi', '📱 UPI'], ['bank', '🏦 Bank'], ['cheque', '🧾 Cheque']].map(([m, l]) => `<div class="chip ${form.mode === m ? 'on' : ''}" data-m="${m}">${l}</div>`).join('')}</div>
+  <label>कौन से बिल का / Against bills <span class="mut">(optional)</span></label><div id="bills">${form.bills.map((b, i) => `<div class="billrow"><input data-i="${i}" data-f="ref" placeholder="Bill no." value="${esc(b.ref)}"><input data-i="${i}" data-f="amount" inputmode="decimal" placeholder="₹" value="${esc(b.amount)}"><button data-del="${i}">✕</button></div>`).join('')}</div>
+  <button class="ghost" id="addbill">+ बिल जोड़ें / Add bill</button>
+  <label>नोट / Note <span class="mut">(optional)</span></label><input id="narr" placeholder="e.g. cheque no. / remark" value="${esc(form.narration)}">
+  <div id="msg"></div><button class="pri" style="margin-top:18px" id="submit">✔ रसीद सेव करें / Save Receipt</button></div>`);
+  const $ = (id) => document.getElementById(id);
+  let st; $('party').oninput = (e) => { form.party = e.target.value; clearTimeout(st); st = setTimeout(async () => { if (!me.parties_synced || form.party.length < 1) { $('sug').innerHTML = ''; return; } try { const l = await api('/api/parties?q=' + encodeURIComponent(form.party)); $('sug').innerHTML = l.length ? `<div class="sug">${l.map((n) => `<div data-n="${esc(n)}">${esc(n)}</div>`).join('')}</div>` : '<div class="mut" style="margin-top:6px">Not found in Tally</div>'; $('sug').querySelectorAll('[data-n]').forEach((d) => (d.onclick = () => { form.party = d.dataset.n; $('party').value = form.party; $('sug').innerHTML = ''; })); } catch {} }, 250); };
+  $('amount').oninput = (e) => (form.amount = e.target.value); $('narr').oninput = (e) => (form.narration = e.target.value);
+  document.querySelectorAll('.chip').forEach((c) => (c.onclick = () => { form.mode = c.dataset.m; document.querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === c)); }));
+  $('addbill').onclick = () => { form.bills.push({ ref: '', amount: '' }); render(); };
+  document.querySelectorAll('#bills input').forEach((i) => (i.oninput = (e) => (form.bills[+i.dataset.i][i.dataset.f] = e.target.value)));
+  document.querySelectorAll('[data-del]').forEach((b) => (b.onclick = () => { form.bills.splice(+b.dataset.del, 1); render(); }));
+  $('submit').onclick = submitReceipt;
+}
+async function submitReceipt() {
+  const btn = document.getElementById('submit'), msg = document.getElementById('msg'); msg.innerHTML = '';
+  const amount = parseFloat(String(form.amount).replace(/,/g, ''));
+  if (!form.party.trim()) return (msg.innerHTML = '<div class="err">ग्राहक चुनें / Choose the customer</div>');
+  if (!(amount > 0)) return (msg.innerHTML = '<div class="err">सही रकम डालें / Enter a valid amount</div>');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  let loc = {}; try { const p = pos || (await Promise.race([getPos(), new Promise((_, r) => setTimeout(r, 8000))])); loc = { lat: p.lat, lng: p.lng }; } catch {}
+  const payload = { client_id: form.client_id, party: form.party.trim(), amount, mode: form.mode, narration: form.narration.trim(), bills: form.bills.filter((b) => b.ref || b.amount).map((b) => ({ ref: b.ref.trim(), amount: parseFloat(String(b.amount).replace(/,/g, '')) })), ...loc };
+  try { const r = await api('/api/receipts', 'POST', payload); form = null; toast(`Receipt saved ✔ ${inr(amount)} · ${payload.party}`); tab = 'hist'; histTab = 'rc'; render(); }
+  catch (e) {
+    if (e instanceof NetErr) { setQ([...getQ(), payload]); form = null; toast('No internet — saved on phone, will send automatically'); tab = 'hist'; histTab = 'rc'; render(); }
+    else { msg.innerHTML = `<div class="err">${esc(e.message)}</div>`; btn.disabled = false; btn.textContent = '✔ रसीद सेव करें / Save Receipt'; }
+  }
+}
+
+async function viewHist() {
+  shell('इतिहास / History', 'आपकी हाज़िरी और रसीदें', `<div class="tabs"><button data-h="att" class="${histTab === 'att' ? 'on' : ''}">📍 हाज़िरी</button><button data-h="rc" class="${histTab === 'rc' ? 'on' : ''}">💰 रसीद</button></div><div id="list" class="card"><div class="mut">Loading…</div></div>`);
+  document.querySelectorAll('[data-h]').forEach((b) => (b.onclick = () => { histTab = b.dataset.h; render(); }));
+  const L = document.getElementById('list');
+  try {
+    if (histTab === 'att') { const rows = await api('/api/attendance'); L.innerHTML = rows.map((r) => `<div class="row"><div><span class="badge b-${r.type}">${r.type === 'in' ? 'IN' : 'OUT'}</span> <span class="mut">${esc(r.godown)}</span></div><b>${fmtDate(r.ts)} · ${fmtTime(r.ts)}</b></div>`).join('') || '<div class="mut">इस महीने कोई हाज़िरी नहीं</div>'; }
+    else {
+      const queued = getQ().map((r) => `<div class="row"><div><b>${esc(r.party)}</b><div class="mut">${esc(r.mode)}</div></div><div style="text-align:right"><div class="amt">${inr(r.amount)}</div><span class="badge b-pending">📲 phone पर सेव</span></div></div>`).join('');
+      const rows = await api('/api/receipts');
+      const lab = { pending: '⏳ Tally का इंतज़ार', synced: '✔ Tally में गया', failed: '✖ Tally error' };
+      L.innerHTML = queued + (rows.map((r) => `<div class="row"><div><b>${esc(r.party)}</b><div class="mut">${fmtDate(r.ts)} · ${esc(r.mode)}${r.voucher_no ? ' · #' + esc(r.voucher_no) : ''}</div>${r.error ? `<div class="mut" style="color:#b91c1c">${esc(r.error)}</div>` : ''}</div><div style="text-align:right"><div class="amt">${inr(r.amount)}</div><span class="badge b-${r.status}">${lab[r.status]}</span></div></div>`).join('') || (queued ? '' : '<div class="mut">अभी कोई रसीद नहीं</div>'));
+    }
+  } catch (e) { L.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+async function viewMe() {
+  shell('प्रोफाइल / Profile', me.staff.role === 'manager' ? 'Manager' : 'Staff', `<div class="card"><div class="row"><span class="mut">नाम</span><b>${esc(me.staff.name)}</b></div><div class="row"><span class="mut">मोबाइल</span><b>${esc(me.staff.mobile)}</b></div><div class="row"><span class="mut">Server</span><b style="font-size:13px">${esc(SERVER.replace(/^https?:\/\//, ''))}</b></div></div>
+  <div id="mgr"></div><button class="pri" id="lo" style="background:linear-gradient(135deg,#ef4444,#f97316)">लॉगआउट / Logout</button>`);
+  document.getElementById('lo').onclick = () => logout();
+  if (me.staff.role === 'manager') {
+    try { const gs = await api('/api/godowns'); document.getElementById('mgr').innerHTML = `<div class="card"><b>🏭 Godown location (Manager)</b><div class="mut" style="margin:4px 0 8px">Godown के बीच में खड़े होकर बटन दबाएँ</div>${gs.map((g) => `<div class="row"><div><b>${esc(g.name)}</b><div class="mut">${g.lat != null ? g.lat.toFixed(5) + ', ' + g.lng.toFixed(5) : 'location not set'} · ${g.radius_m} m</div></div><button class="ghost" data-g="${g.id}">📍 Set here</button></div>`).join('')}</div>`;
+      document.querySelectorAll('[data-g]').forEach((b) => (b.onclick = async () => { if (!confirm('Set this godown location to where you are standing now?')) return; b.textContent = '…'; try { const p = await getPos(); await api(`/api/godowns/${b.dataset.g}/here`, 'POST', p); toast(`Saved ✔ (GPS ±${Math.round(p.accuracy)} m)`); await loadMe(); render(); } catch (e) { toast(e.message); b.textContent = '📍 Set here'; } })); } catch {}
+  }
+}
+
+function render() {
+  if (!SERVER) return viewSetup();
+  if (!token) return viewLogin();
+  if (!me) { $app.innerHTML = '<div class="login"><div class="box"><img src="logo.png" alt=""><h2>Ropo Staff</h2><p>Loading…</p></div></div>'; loadMe().then(() => { render(); flushQueue(); refreshPos(); }).catch((e) => { if (token) $app.innerHTML = `<div class="login"><div class="box"><img src="logo.png" alt=""><div class="err">${esc(e.message)}</div><button class="pri" onclick="location.reload()">Retry</button></div></div>`; }); return; }
+  ({ home: viewHome, receipt: viewReceipt, hist: viewHist, me: viewMe })[tab]();
+}
+render();
+if (window.Capacitor?.Plugins?.App) window.Capacitor.Plugins.App.addListener?.('resume', () => { if (token && tab === 'home') refreshPos(); flushQueue(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+# Builds the Ropo Staff Android APK and attaches it to a GitHub Release (download link to share with staff).
+name: Build Ropo Staff APK
+
+on:
+  push:
+    paths: ['apps/staff/mobile/**', '.github/workflows/staff-app.yml']
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: 'Ropo Staff server address baked into the APK (optional, e.g. https://staff.example.com)'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: apps/staff/mobile } }
+    env:
+      VERSION: 1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: android-actions/setup-android@v3
+      - name: Bake in server address
+        env: { SERVER_URL: '${{ inputs.server_url || vars.ROPO_SERVER_URL }}' }
+        run: |
+          if [ -n "$SERVER_URL" ]; then printf 'window.ROPO_CONFIG = { SERVER_URL: "%s" };\n' "$SERVER_URL" > www/config.js; fi
+      - name: Restore signing key (optional secrets)
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_B64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> $GITHUB_ENV
+            echo "KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+            echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
+          else
+            echo "::warning::No ANDROID_KEYSTORE_B64 secret - building a debug-signed APK. New APKs will NOT install over an old one (uninstall first). Add the secrets once to fix this."
+          fi
+      - name: Create Android project
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+          npx capacitor-assets generate --android --iconBackgroundColor '#7c3aed' --splashBackgroundColor '#5b21b6'
+          python3 scripts/patch-android.py ${{ github.run_number }} $VERSION
+          npx cap sync android
+      - name: Build APK
+        working-directory: apps/staff/mobile/android
+        run: |
+          chmod +x gradlew
+          if [ -n "$KEYSTORE_PATH" ]; then ./gradlew assembleRelease; cp app/build/outputs/apk/release/app-release.apk ../Ropo-Staff.apk
+          else ./gradlew assembleDebug; cp app/build/outputs/apk/debug/app-debug.apk ../Ropo-Staff.apk; fi
+      - uses: actions/upload-artifact@v4
+        with: { name: Ropo-Staff-apk, path: apps/staff/mobile/Ropo-Staff.apk }
+      - name: Attach APK to a release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: staff-v${{ env.VERSION }}
+          name: Ropo Staff app v${{ env.VERSION }}
+          files: apps/staff/mobile/Ropo-Staff.apk

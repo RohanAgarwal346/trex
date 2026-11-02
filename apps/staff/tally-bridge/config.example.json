@@ -1,0 +1,9 @@
+{
+  "serverUrl": "https://YOUR-SERVER-ADDRESS",
+  "bridgeKey": "paste the Bridge key from the admin panel > Settings",
+  "company": "",
+  "tallyHost": "127.0.0.1",
+  "tallyPort": 9000,
+  "partyGroups": ["Sundry Debtors"],
+  "pollSeconds": 20
+}
